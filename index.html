@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluador CAPEX</title>
+  <link rel="stylesheet" href="styles.css?v=20260427-34">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Formato digital de evaluación</p>
+        <h1>FORMATO DE EVALUACIÓN DE CAPEX</h1>
+      </div>
+      <div class="hero-logo-panel">
+        <div class="brand-logo-frame" aria-label="Logo Casa Pellas">
+          <img
+            class="brand-logo-source"
+            src="assets/logo-casa-pellas.png"
+            alt="Logo Casa Pellas"
+          >
+        </div>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="panel input-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Paso 1. Ingresa Datos al Formulario CAPEX</h2>
+          </div>
+          <button id="newCapex" class="secondary-button new-capex-button small-capex-button" type="button">
+            Nuevo CAPEX
+          </button>
+        </div>
+
+        <section class="form-section">
+          <div class="section-title">
+            <h3>I. Datos Generales del Proyecto</h3>
+          </div>
+          <div class="form-grid two-wide">
+            <label>
+              <span>Codigo unico del proyecto</span>
+              <input id="projectCode" type="text" value="" readonly>
+            </label>
+            <label class="full-span">
+              <span>Nombre del proyecto</span>
+              <input id="projectName" type="text" value="Renovacion de linea de produccion">
+            </label>
+            <label class="full-span">
+              <span>Tipo de impacto CAPEX</span>
+              <input id="impactCategory" type="hidden" value="Ventas">
+              <div class="strategy-options impact-options" id="impactCategoryOptions">
+                <button class="impact-button active" type="button" data-value="Ventas">Ventas</button>
+                <button class="impact-button" type="button" data-value="Ahorro">Ahorro</button>
+                <button class="impact-button" type="button" data-value="No genera impacto economico">Sin impacto</button>
+              </div>
+            </label>
+            <label>
+              <span>Area solicitante</span>
+              <select id="businessArea">
+                <option value="Repuestos">Repuestos</option>
+                <option value="Autos Nuevos Toyota">Autos Nuevos Toyota</option>
+                <option value="Cpd Repuestos">Cpd Repuestos</option>
+                <option value="Talleres - Autos">Talleres - Autos</option>
+                <option value="Informatica">Informatica</option>
+                <option value="Rent A Car">Rent A Car</option>
+                <option value="Camiones Hino">Camiones Hino</option>
+                <option value="Talleres - Hino">Talleres - Hino</option>
+                <option value="Talleres">Talleres</option>
+                <option value="Fidem">Fidem</option>
+                <option value="Capital Humano">Capital Humano</option>
+                <option value="Autos Usados">Autos Usados</option>
+                <option value="Autos Nuevos Suzuki">Autos Nuevos Suzuki</option>
+                <option value="Equipos Industriales">Equipos Industriales</option>
+                <option value="Call Center">Call Center</option>
+                <option value="Capesa">Capesa</option>
+                <option value="Talleres - Motos">Talleres - Motos</option>
+                <option value="Mercadeo">Mercadeo</option>
+                <option value="Autos Nuevos Kia">Autos Nuevos Kia</option>
+                <option value="Autos Nuevos Geely">Autos Nuevos Geely</option>
+                <option value="Camiones Faw">Camiones Faw</option>
+                <option value="Motos - Genesis">Motos - Genesis</option>
+                <option value="Motos - Yamaha">Motos - Yamaha</option>
+                <option value="Motos - Hero">Motos - Hero</option>
+                <option value="Motos - Yadea">Motos - Yadea</option>
+                <option value="Finanzas">Finanzas</option>
+                <option value="Alpesa">Alpesa</option>
+              </select>
+            </label>
+            <label>
+              <span>Responsable</span>
+              <input id="sponsor" type="text" value="Miguel Sacasa">
+            </label>
+            <label>
+              <span>Categoria</span>
+              <select id="projectType">
+                <option value="expansion">Expansion</option>
+                <option value="productivity" selected>Productividad</option>
+                <option value="replacement">Reemplazo</option>
+                <option value="compliance">Cumplimiento</option>
+                <option value="strategic">Estrategico</option>
+              </select>
+            </label>
+            <label>
+              <span>Horizonte (anos)</span>
+              <input id="projectLife" type="number" min="3" max="10" step="1" value="5">
+            </label>
+            <label class="full-span">
+              <span>Objetivo del proyecto</span>
+              <textarea id="projectGoal" rows="3">Reducir paros de linea, elevar productividad y bajar costos de conversion.</textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <div class="section-title">
+            <h3>II. Justificacion Estrategica</h3>
+          </div>
+          <div class="strategy-block">
+            <input id="strategicFocus" type="hidden" value="Ventas">
+            <div class="table-wrap">
+              <table class="strategy-table">
+                <thead>
+                  <tr>
+                    <th>Pregunta</th>
+                    <th>Respuesta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>¿Como se alinea con la estrategia de Casa Pellas?</td>
+                    <td>
+                      <select id="strategyAlignmentText">
+                        <option value="">Seleccione una opcion</option>
+                        <option value="Crecimiento de ventas en lineas clave">Crecimiento de ventas en lineas clave</option>
+                        <option value="Mejora de eficiencia operativa">Mejora de eficiencia operativa</option>
+                        <option value="Optimizacion de costos">Optimizacion de costos</option>
+                        <option value="Mejora de experiencia del cliente">Mejora de experiencia del cliente</option>
+                        <option value="Expansion de mercado / cobertura">Expansion de mercado / cobertura</option>
+                        <option value="Innovacion / transformacion digital">Innovacion / transformacion digital</option>
+                        <option value="Cumplimiento regulatorio o continuidad del negocio">Cumplimiento regulatorio o continuidad del negocio</option>
+                        <option value="Fortalecimiento de la marca">Fortalecimiento de la marca</option>
+                      </select>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>¿Que problema resuelve?</td>
+                    <td>
+                      <select id="problemSolvedText">
+                        <option value="">Seleccione una opcion</option>
+                        <option value="Baja productividad en procesos actuales">Baja productividad en procesos actuales</option>
+                        <option value="Altos costos operativos">Altos costos operativos</option>
+                        <option value="Tiempos de atencion elevados">Tiempos de atencion elevados</option>
+                        <option value="Insatisfaccion del cliente">Insatisfaccion del cliente</option>
+                        <option value="Limitacion de capacidad instalada">Limitacion de capacidad instalada</option>
+                        <option value="Reducir zonas del territorio nacional sin cobertura">Reducir zonas del territorio nacional sin cobertura</option>
+                        <option value="Falta de control / visibilidad de informacion">Falta de control / visibilidad de informacion</option>
+                        <option value="Riesgo operativo o incumplimiento">Riesgo operativo o incumplimiento</option>
+                        <option value="Obsolescencia de equipos o sistemas">Obsolescencia de equipos o sistemas</option>
+                      </select>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>¿Que impacto resumido se espera?</td>
+                    <td>
+                      <select id="expectedImpactText">
+                        <option value="">Seleccione una opcion</option>
+                        <option value="Incremento de ingresos">Incremento de ingresos</option>
+                        <option value="Reduccion de costos">Reduccion de costos</option>
+                        <option value="Mejora en tiempos de proceso">Mejora en tiempos de proceso</option>
+                        <option value="Mejora en satisfaccion del cliente">Mejora en satisfaccion del cliente</option>
+                        <option value="Aumento de capacidad operativa">Aumento de capacidad operativa</option>
+                        <option value="Reduccion de riesgos">Reduccion de riesgos</option>
+                        <option value="Cumplimiento normativo asegurado">Cumplimiento normativo asegurado</option>
+                      </select>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <div class="section-title">
+            <h3>III. Inversi&oacute;n Requerida</h3>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>Equipos Principales</span>
+              <input id="equipmentCost" type="number" min="0" step="1000" value="320000">
+            </label>
+            <label>
+              <span>Instalacion y/o Implementacion</span>
+              <input id="installationCost" type="number" min="0" step="1000" value="55000">
+            </label>
+            <label>
+              <span>Capacitacion</span>
+              <input id="trainingCost" type="number" min="0" step="1000" value="12000">
+            </label>
+            <label>
+              <span>Otros Costos</span>
+              <input id="otherCosts" type="number" min="0" step="1000" value="28000">
+            </label>
+            <label class="total-field">
+              <span>Monto total</span>
+              <input id="requiredInvestmentTotal" type="number" value="415000" readonly>
+            </label>
+          </div>
+          <input id="workingCapital" type="hidden" value="0">
+          <input id="salvageValue" type="hidden" value="0">
+          <input id="implementationMonths" type="hidden" value="6">
+        </section>
+
+        <section class="form-section">
+          <div class="section-title">
+            <h3>IV. Supuestos del Impacto</h3>
+          </div>
+          <div class="form-grid">
+            <label class="impact-field" data-impact="Ventas">
+              <span>Unidades estimadas año 1</span>
+              <input id="salesUnitsYear1" type="number" min="0" step="1" value="1000">
+            </label>
+            <label class="impact-field" data-impact="Ventas">
+              <span>Ticket price / precio promedio</span>
+              <input id="ticketPrice" type="number" min="0" step="1" value="220">
+            </label>
+            <label class="impact-field" data-impact="Ventas">
+              <span>Crecimiento anual de unidades (%)</span>
+              <input id="unitGrowthRate" type="number" min="-20" max="100" step="0.1" value="20">
+            </label>
+            <label class="impact-field" data-impact="Ventas">
+              <span>Costo variable sobre ventas (%)</span>
+              <input id="variableCostPct" type="number" min="0" max="100" step="0.1" value="47">
+            </label>
+            <label class="impact-field" data-impact="Ventas">
+              <span>Gastos operativos sobre ventas (%)</span>
+              <input id="salesExpensePct" type="number" min="0" max="100" step="0.1" value="20.7">
+            </label>
+            <label class="impact-field" data-impact="Ventas">
+              <span>Gasto fijo incremental anual</span>
+              <input id="fixedCommercialCost" type="number" min="0" step="1000" value="78000">
+            </label>
+            <label class="impact-field" data-impact="legacy">
+              <span>Incremento de ingresos anual</span>
+              <input id="annualRevenueIncrease" type="number" min="0" step="1000" value="180000">
+            </label>
+            <label class="impact-field" data-impact="Ahorro">
+              <span>Ahorro anual en costos</span>
+              <input id="annualCostSavings" type="number" min="0" step="1000" value="145000">
+            </label>
+            <label class="impact-field" data-impact="Ahorro,No genera impacto economico">
+              <span>Costos operativos incrementales</span>
+              <input id="annualOpexIncrease" type="number" min="0" step="1000" value="62000">
+            </label>
+            <label class="impact-field" data-impact="Ahorro">
+              <span>Beneficio por riesgos evitados</span>
+              <input id="riskAvoidanceBenefit" type="number" min="0" step="1000" value="30000">
+            </label>
+            <label class="impact-field" data-impact="Ahorro">
+              <span>Tasa de crecimiento anual (%)</span>
+              <input id="annualGrowthRate" type="number" min="-20" max="40" step="0.1" value="4">
+            </label>
+            <label class="impact-field" data-impact="Ventas,Ahorro,No genera impacto economico">
+              <span>Depreciacion anual</span>
+              <input id="annualDepreciation" type="number" min="0" step="1000" value="72000">
+            </label>
+            <div class="impact-note impact-field full-span" data-impact="No genera impacto economico">
+              Este tipo de CAPEX no genera ingresos ni ahorros directos. La evaluación se enfoca en continuidad, cumplimiento, riesgo, urgencia operativa y preparación de ejecución.
+            </div>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <div class="section-title">
+            <h3>V. Supuestos Financieros</h3>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>WACC / tasa descuento (%)</span>
+              <input id="discountRate" type="number" min="0" max="40" step="0.1" value="12">
+            </label>
+            <label>
+              <span>Tasa de impuesto (%)</span>
+              <input id="taxRate" type="number" min="0" max="40" step="0.1" value="30">
+            </label>
+            <label>
+              <span>TIR minima requerida (%)</span>
+              <input id="requiredIrr" type="number" min="0" max="50" step="0.1" value="15">
+            </label>
+            <label>
+              <span>Payback maximo (anos)</span>
+              <input id="maxPayback" type="number" min="1" max="10" step="0.1" value="4">
+            </label>
+            <label>
+              <span>Meta ROI (%)</span>
+              <input id="targetRoi" type="number" min="0" max="200" step="0.1" value="35">
+            </label>
+            <label>
+              <span>Meta score integral (%)</span>
+              <input id="targetScore" type="number" min="0" max="100" step="1" value="85">
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <div class="section-title">
+            <h3>Score cualitativo</h3>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>Alineacion estrategica (1-5)</span>
+              <input id="strategicAlignment" type="number" min="1" max="5" step="1" value="5">
+            </label>
+            <label>
+              <span>Urgencia operativa (1-5)</span>
+              <input id="operationalUrgency" type="number" min="1" max="5" step="1" value="4">
+            </label>
+            <label>
+              <span>Reduccion de riesgo (1-5)</span>
+              <input id="riskReduction" type="number" min="1" max="5" step="1" value="4">
+            </label>
+            <label>
+              <span>Capacidad de ejecucion (1-5)</span>
+              <input id="executionReadiness" type="number" min="1" max="5" step="1" value="4">
+            </label>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button id="evaluateProject" class="primary-button">Evaluar proyecto</button>
+          <div class="action-row">
+            <button id="downloadPdf" class="secondary-button" type="button">Reporte ejecutivo PDF</button>
+            <button id="downloadExcel" class="secondary-button" type="button">Descargar Excel</button>
+          </div>
+          <p id="evaluationStatus" class="status-text">Listo para calcular.</p>
+        </div>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Paso 2. Revisa el Resultado de la Evaluación</h2>
+          </div>
+          <span id="decisionBadge" class="decision-badge neutral">En revision</span>
+        </div>
+
+        <article class="summary-strip">
+          <div>
+            <p class="summary-label">Proyecto</p>
+            <h3 id="projectHeadline">Renovacion de linea de produccion</h3>
+          </div>
+          <div>
+            <p class="summary-label">Area</p>
+            <strong id="areaHeadline">Operaciones</strong>
+          </div>
+          <div>
+            <p class="summary-label">Responsable</p>
+            <strong id="sponsorHeadline">Gerencia Industrial</strong>
+          </div>
+          <div>
+            <p class="summary-label">Impacto CAPEX</p>
+            <strong id="typeHeadline">Ventas</strong>
+          </div>
+        </article>
+
+        <div id="metricCards" class="metric-grid"></div>
+
+        <div class="chart-grid flow-only-grid">
+          <article class="chart-card compact-chart-card">
+            <div class="card-head">
+              <h3>Flujo neto proyectado</h3>
+              <span class="mini-tag">5 anos</span>
+            </div>
+            <canvas id="cashFlowChart" class="cash-flow-chart" width="760" height="240"></canvas>
+          </article>
+        </div>
+
+        <article class="insight-card wide score-executive-card">
+          <div class="card-head">
+            <h3>Score ejecutivo</h3>
+          </div>
+          <div id="scoreTable" class="probability-table score-table"></div>
+        </article>
+
+        <article class="insight-card wide">
+          <div class="card-head">
+            <h3>RECOMENDACIÓN</h3>
+            <span id="recommendationTag" class="mini-tag">Pendiente</span>
+          </div>
+          <p id="recommendationLead" class="recommendation-lead"></p>
+          <div id="recommendationList" class="recommendation-list"></div>
+        </article>
+
+        <article class="insight-card wide cashflow-detail-card">
+          <div class="card-head">
+            <h3>Detalle de flujos</h3>
+            <span class="mini-tag">Generado automaticamente</span>
+          </div>
+          <div class="table-wrap">
+            <table class="cashflow-matrix">
+              <thead id="cashflowMatrixHead"></thead>
+              <tbody id="cashflowBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js?v=20260427-34"></script>
+</body>
+</html>
