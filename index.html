@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluador CAPEX</title>
-  <link rel="stylesheet" href="styles.css?v=20260427-34">
+  <link rel="stylesheet" href="styles.css?v=20260429-06">
 </head>
 <body>
   <div class="page-shell">
@@ -28,38 +28,93 @@
       <section class="panel input-panel">
         <div class="panel-header">
           <div>
-            <h2>Paso 1. Ingresa Datos al Formulario CAPEX</h2>
+            <h2 class="form-flow-title">Completa el Formulario por Etapas</h2>
           </div>
           <button id="newCapex" class="secondary-button new-capex-button small-capex-button" type="button">
             Nuevo CAPEX
           </button>
         </div>
 
-        <section class="form-section">
+        <nav class="wizard-steps" aria-label="Pasos del formulario CAPEX">
+          <button class="wizard-step active" type="button" data-step="type">
+            <span>1</span>
+            <strong>Tipo</strong>
+          </button>
+          <button class="wizard-step" type="button" data-step="cost">
+            <span>2</span>
+            <strong>Inversion</strong>
+          </button>
+          <button class="wizard-step" type="button" data-step="impact">
+            <span>3</span>
+            <strong>Impacto</strong>
+          </button>
+          <button class="wizard-step" type="button" data-step="assumptions">
+            <span>4</span>
+            <strong>Supuestos</strong>
+          </button>
+          <button class="wizard-step" type="button" data-step="result">
+            <span>5</span>
+            <strong>Resultado</strong>
+          </button>
+        </nav>
+
+        <section class="corporate-strip" data-step-section="assumptions" aria-label="Supuestos definidos por Finanzas" hidden>
+          <p class="corporate-strip-label">Valores Corporativos Establecidos</p>
+          <div class="locked-assumption">
+            <span class="lock-icon" aria-hidden="true">&#128274;</span>
+            <label>
+              <span>WACC</span>
+              <input id="discountRate" type="number" min="0" max="40" step="0.1" value="12" readonly data-corporate="true">
+            </label>
+          </div>
+          <div class="locked-assumption">
+            <span class="lock-icon" aria-hidden="true">&#128274;</span>
+            <label>
+              <span>Impuesto</span>
+              <input id="taxRate" type="number" min="0" max="40" step="0.1" value="32" readonly data-corporate="true">
+            </label>
+          </div>
+          <div class="locked-assumption">
+            <span class="lock-icon" aria-hidden="true">&#128274;</span>
+            <label>
+              <span>TIR minima</span>
+              <input id="requiredIrr" type="number" min="0" max="50" step="0.1" value="15" readonly data-corporate="true">
+            </label>
+          </div>
+          <div class="locked-assumption">
+            <span class="lock-icon" aria-hidden="true">&#128274;</span>
+            <label>
+              <span>Payback max.</span>
+              <input id="maxPayback" type="number" min="1" max="10" step="0.1" value="5" readonly data-corporate="true">
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section" data-step-section="type">
           <div class="section-title">
             <h3>I. Datos Generales del Proyecto</h3>
           </div>
           <div class="form-grid two-wide">
             <label>
+              <span>Tipo de CAPEX</span>
+              <select id="projectType" required>
+                <option value="Mantenimiento">Mantenimiento</option>
+                <option value="Crecimiento" selected>Crecimiento</option>
+                <option value="Estrategico">Estrat&eacute;gico</option>
+                <option value="Regulatorio">Regulatorio</option>
+              </select>
+            </label>
+            <label hidden>
               <span>Codigo unico del proyecto</span>
               <input id="projectCode" type="text" value="" readonly>
             </label>
             <label class="full-span">
               <span>Nombre del proyecto</span>
-              <input id="projectName" type="text" value="Renovacion de linea de produccion">
-            </label>
-            <label class="full-span">
-              <span>Tipo de impacto CAPEX</span>
-              <input id="impactCategory" type="hidden" value="Ventas">
-              <div class="strategy-options impact-options" id="impactCategoryOptions">
-                <button class="impact-button active" type="button" data-value="Ventas">Ventas</button>
-                <button class="impact-button" type="button" data-value="Ahorro">Ahorro</button>
-                <button class="impact-button" type="button" data-value="No genera impacto economico">Sin impacto</button>
-              </div>
+              <input id="projectName" type="text" value="Renovacion de linea de produccion" required>
             </label>
             <label>
               <span>Area solicitante</span>
-              <select id="businessArea">
+              <select id="businessArea" required>
                 <option value="Repuestos">Repuestos</option>
                 <option value="Autos Nuevos Toyota">Autos Nuevos Toyota</option>
                 <option value="Cpd Repuestos">Cpd Repuestos</option>
@@ -90,20 +145,38 @@
               </select>
             </label>
             <label>
-              <span>Responsable</span>
-              <input id="sponsor" type="text" value="Miguel Sacasa">
+              <span>Sponsor / Driver</span>
+              <input id="sponsor" type="text" value="Miguel Sacasa" required>
             </label>
             <label>
-              <span>Categoria</span>
-              <select id="projectType">
-                <option value="expansion">Expansion</option>
-                <option value="productivity" selected>Productividad</option>
-                <option value="replacement">Reemplazo</option>
-                <option value="compliance">Cumplimiento</option>
-                <option value="strategic">Estrategico</option>
+              <span>Objetivo Estrat&eacute;gico</span>
+              <select id="strategicObjectives" required>
+                <option value="">Seleccione una opcion</option>
+                <option value="Consolidar Participaci&oacute;n En Mercado Automotriz">Consolidar Participaci&oacute;n En Mercado Automotriz</option>
+                <option value="Crecer Nuestro Negocio Posventa">Crecer Nuestro Negocio Posventa</option>
+                <option value="Anticipar Y Gestionar Riesgos">Anticipar Y Gestionar Riesgos</option>
+                <option value="Desarrollar Excelente Personas Y Procesos">Desarrollar Excelente Personas Y Procesos</option>
               </select>
             </label>
             <label>
+              <span>Proyecto Malta Asociado</span>
+              <select id="maltaProject" required>
+                <option value="">Seleccione un objetivo estrat&eacute;gico primero</option>
+              </select>
+            </label>
+            <label>
+              <span>KPI Grupo que Impacta</span>
+              <select id="groupKpi" required>
+                <option value="">Seleccione una opcion</option>
+                <option value="EBITDA">EBITDA</option>
+                <option value="Ventas / margen bruto">Ventas / margen bruto</option>
+                <option value="Productividad operativa">Productividad operativa</option>
+                <option value="NPS / satisfaccion de clientes">NPS / satisfaccion de clientes</option>
+                <option value="Cumplimiento regulatorio">Cumplimiento regulatorio</option>
+                <option value="Continuidad operacional">Continuidad operacional</option>
+              </select>
+            </label>
+            <label hidden>
               <span>Horizonte (anos)</span>
               <input id="projectLife" type="number" min="3" max="10" step="1" value="5">
             </label>
@@ -114,9 +187,9 @@
           </div>
         </section>
 
-        <section class="form-section">
+        <section class="form-section" hidden aria-hidden="true">
           <div class="section-title">
-            <h3>II. Justificacion Estrategica</h3>
+            <h3>IV. Supuestos y Gobernanza</h3>
           </div>
           <div class="strategy-block">
             <input id="strategicFocus" type="hidden" value="Ventas">
@@ -183,9 +256,9 @@
           </div>
         </section>
 
-        <section class="form-section">
+        <section class="form-section" data-step-section="cost">
           <div class="section-title">
-            <h3>III. Inversi&oacute;n Requerida</h3>
+            <h3>II. Inversi&oacute;n Requerida</h3>
           </div>
           <div class="form-grid">
             <label>
@@ -214,11 +287,20 @@
           <input id="implementationMonths" type="hidden" value="6">
         </section>
 
-        <section class="form-section">
+        <section class="form-section" data-step-section="impact">
           <div class="section-title">
-            <h3>IV. Supuestos del Impacto</h3>
+            <h3>III. Impacto Esperado</h3>
           </div>
           <div class="form-grid">
+            <label class="full-span">
+              <span>Tipo de impacto esperado</span>
+              <input id="impactCategory" type="hidden" value="Ventas">
+              <div class="strategy-options impact-options" id="impactCategoryOptions">
+                <button class="impact-button active" type="button" data-value="Ventas">Ventas</button>
+                <button class="impact-button" type="button" data-value="Ahorro">Ahorro</button>
+                <button class="impact-button" type="button" data-value="No genera impacto economico">Sin impacto</button>
+              </div>
+            </label>
             <label class="impact-field" data-impact="Ventas">
               <span>Unidades estimadas año 1</span>
               <input id="salesUnitsYear1" type="number" min="0" step="1" value="1000">
@@ -263,49 +345,32 @@
               <span>Tasa de crecimiento anual (%)</span>
               <input id="annualGrowthRate" type="number" min="-20" max="40" step="0.1" value="4">
             </label>
-            <label class="impact-field" data-impact="Ventas,Ahorro,No genera impacto economico">
-              <span>Depreciacion anual</span>
-              <input id="annualDepreciation" type="number" min="0" step="1000" value="72000">
-            </label>
             <div class="impact-note impact-field full-span" data-impact="No genera impacto economico">
               Este tipo de CAPEX no genera ingresos ni ahorros directos. La evaluación se enfoca en continuidad, cumplimiento, riesgo, urgencia operativa y preparación de ejecución.
             </div>
           </div>
         </section>
 
-        <section class="form-section">
+        <input id="targetRoi" type="hidden" value="35">
+        <input id="targetScore" type="hidden" value="85">
+
+        <section class="form-section" data-step-section="assumptions">
           <div class="section-title">
-            <h3>V. Supuestos Financieros</h3>
+            <h3>Supuestos financieros</h3>
           </div>
           <div class="form-grid">
             <label>
-              <span>WACC / tasa descuento (%)</span>
-              <input id="discountRate" type="number" min="0" max="40" step="0.1" value="12">
+              <span>Valor residual (%)</span>
+              <input id="residualPct" type="number" min="0" max="100" step="0.1" value="13.3">
             </label>
-            <label>
-              <span>Tasa de impuesto (%)</span>
-              <input id="taxRate" type="number" min="0" max="40" step="0.1" value="30">
-            </label>
-            <label>
-              <span>TIR minima requerida (%)</span>
-              <input id="requiredIrr" type="number" min="0" max="50" step="0.1" value="15">
-            </label>
-            <label>
-              <span>Payback maximo (anos)</span>
-              <input id="maxPayback" type="number" min="1" max="10" step="0.1" value="4">
-            </label>
-            <label>
-              <span>Meta ROI (%)</span>
-              <input id="targetRoi" type="number" min="0" max="200" step="0.1" value="35">
-            </label>
-            <label>
-              <span>Meta score integral (%)</span>
-              <input id="targetScore" type="number" min="0" max="100" step="1" value="85">
+            <label class="total-field">
+              <span>Depreciacion anual calculada</span>
+              <input id="annualDepreciation" type="number" min="0" step="1000" value="72000" readonly>
             </label>
           </div>
         </section>
 
-        <section class="form-section">
+        <section class="form-section" data-step-section="assumptions">
           <div class="section-title">
             <h3>Score cualitativo</h3>
           </div>
@@ -329,8 +394,14 @@
           </div>
         </section>
 
+        <div id="validationPanel" class="validation-panel" aria-live="polite"></div>
+
+        <div class="wizard-controls">
+          <button id="prevStep" class="secondary-button" type="button">Atrás</button>
+          <button id="nextStep" class="secondary-button" type="button">Siguiente</button>
+        </div>
+
         <div class="actions">
-          <button id="evaluateProject" class="primary-button">Evaluar proyecto</button>
           <div class="action-row">
             <button id="downloadPdf" class="secondary-button" type="button">Reporte ejecutivo PDF</button>
             <button id="downloadExcel" class="secondary-button" type="button">Descargar Excel</button>
@@ -339,12 +410,11 @@
         </div>
       </section>
 
-      <section class="panel results-panel">
+      <section class="panel results-panel" data-step-section="result">
         <div class="panel-header">
           <div>
-            <h2>Paso 2. Revisa el Resultado de la Evaluación</h2>
+            <h2>Evaluaci&oacute;n y Recomendaci&oacute;n del Proyecto</h2>
           </div>
-          <span id="decisionBadge" class="decision-badge neutral">En revision</span>
         </div>
 
         <article class="summary-strip">
@@ -357,33 +427,16 @@
             <strong id="areaHeadline">Operaciones</strong>
           </div>
           <div>
-            <p class="summary-label">Responsable</p>
+            <p class="summary-label">Sponsor / Driver</p>
             <strong id="sponsorHeadline">Gerencia Industrial</strong>
           </div>
           <div>
-            <p class="summary-label">Impacto CAPEX</p>
+            <p class="summary-label">Tipo CAPEX</p>
             <strong id="typeHeadline">Ventas</strong>
           </div>
         </article>
 
-        <div id="metricCards" class="metric-grid"></div>
-
-        <div class="chart-grid flow-only-grid">
-          <article class="chart-card compact-chart-card">
-            <div class="card-head">
-              <h3>Flujo neto proyectado</h3>
-              <span class="mini-tag">5 anos</span>
-            </div>
-            <canvas id="cashFlowChart" class="cash-flow-chart" width="760" height="240"></canvas>
-          </article>
-        </div>
-
-        <article class="insight-card wide score-executive-card">
-          <div class="card-head">
-            <h3>Score ejecutivo</h3>
-          </div>
-          <div id="scoreTable" class="probability-table score-table"></div>
-        </article>
+        <div id="metricCards" class="metric-grid hero-metric-grid"></div>
 
         <article class="insight-card wide">
           <div class="card-head">
@@ -394,22 +447,37 @@
           <div id="recommendationList" class="recommendation-list"></div>
         </article>
 
-        <article class="insight-card wide cashflow-detail-card">
-          <div class="card-head">
-            <h3>Detalle de flujos</h3>
-            <span class="mini-tag">Generado automaticamente</span>
+        <details class="financial-detail">
+          <summary>Ver detalle financiero</summary>
+          <div id="detailMetricCards" class="metric-grid detail-metric-grid"></div>
+
+          <div class="chart-grid flow-only-grid">
+            <article class="chart-card compact-chart-card">
+              <div class="card-head">
+                <h3>Flujo neto proyectado</h3>
+                <span class="mini-tag">5 anos</span>
+              </div>
+              <canvas id="cashFlowChart" class="cash-flow-chart" width="760" height="240"></canvas>
+            </article>
           </div>
-          <div class="table-wrap">
-            <table class="cashflow-matrix">
-              <thead id="cashflowMatrixHead"></thead>
-              <tbody id="cashflowBody"></tbody>
-            </table>
-          </div>
-        </article>
+
+          <article class="insight-card wide cashflow-detail-card">
+            <div class="card-head">
+              <h3>Detalle de flujos</h3>
+              <span class="mini-tag">Generado automaticamente</span>
+            </div>
+            <div class="table-wrap">
+              <table class="cashflow-matrix">
+                <thead id="cashflowMatrixHead"></thead>
+                <tbody id="cashflowBody"></tbody>
+              </table>
+            </div>
+          </article>
+        </details>
       </section>
     </main>
   </div>
 
-  <script src="app.js?v=20260427-34"></script>
+  <script src="app.js?v=20260429-13"></script>
 </body>
 </html>

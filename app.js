@@ -5,6 +5,9 @@ const fieldIds = [
   "sponsor",
   "impactCategory",
   "strategicFocus",
+  "maltaProject",
+  "groupKpi",
+  "strategicObjectives",
   "strategyAlignmentText",
   "problemSolvedText",
   "expectedImpactText",
@@ -18,6 +21,7 @@ const fieldIds = [
   "requiredInvestmentTotal",
   "workingCapital",
   "salvageValue",
+  "residualPct",
   "implementationMonths",
   "annualRevenueIncrease",
   "annualCostSavings",
@@ -44,12 +48,250 @@ const fieldIds = [
 ];
 
 const projectTypeLabels = {
-  expansion: "Expansion",
-  productivity: "Productividad",
-  replacement: "Reemplazo",
-  compliance: "Cumplimiento",
+  Mantenimiento: "Mantenimiento",
+  Crecimiento: "Crecimiento",
+  Estrategico: "Estratégico",
+  Regulatorio: "Regulatorio",
+  expansion: "Crecimiento",
+  productivity: "Crecimiento",
+  replacement: "Mantenimiento",
+  compliance: "Regulatorio",
+  strategic: "Estratégico",
+};
+
+const legacyProjectTypeMap = {
+  expansion: "Crecimiento",
+  productivity: "Crecimiento",
+  replacement: "Mantenimiento",
+  compliance: "Regulatorio",
   strategic: "Estrategico",
 };
+
+const corporateAssumptions = {
+  discountRate: 12,
+  taxRate: 32,
+  requiredIrr: 15,
+  maxPayback: 5,
+};
+const strategicObjectiveSeparator = " | ";
+const maltaProjectsByStrategicObjective = {
+  "Consolidar Participaci\u00f3n En Mercado Automotriz": [
+    "Casa Matriz Suzuki 3S",
+    "Mejorar Canal DA de Motos",
+    "Crecer red de Motos: CH, ES, MGA, Rivas",
+    "Toyota (Plaza Tonalli / Master Plan Km 11)",
+    "Hino (HQ Managua y Juigalpa)",
+    "Aumentar intercambios en autos y recompra v\u00eda talleres",
+    "Venta Digital 3.0 (fortalecer canal digital)",
+    "Establecer Dealer Awards Sucursales Automotrices",
+    "Consultor\u00eda de customer journey en Suzuki",
+    "Suzuki (Estel\u00ed)",
+    "Geely + FAW (Chinandega)",
+    "Kia (Matagalpa)",
+  ],
+  "Crecer Nuestro Negocio Posventa": [
+    "Taller Casa Pellas Matagalpa",
+    "Venta de cascos de motos",
+    "Continuar creciendo red de Talleres Express: S\u00e9baco, Managua y Le\u00f3n",
+    "Fortalecer el canal para reclamo de clientes",
+    "Estandarizar y desplegar programa de atenci\u00f3n al cliente corporativo",
+    "PMP 2.0",
+    "Reingenier\u00eda modelo taller de motos",
+  ],
+  "Anticipar Y Gestionar Riesgos": [
+    "Seguimiento de Eficiencia por l\u00ednea de negocios",
+    "Ajustar la capacidad log\u00edstica de motos",
+    "Migrar deuda de corto plazo a largo plazo",
+    "Crear Depto. de Cumplimiento y Legal",
+    "Cultura Genchi Genbutsu (Relaciones)",
+    "Expansi\u00f3n CPD",
+    "Ajustar la capacidad log\u00edstica de autos",
+    "Track de retorno sobre plazas y proyectos aprobados",
+    "Edificio Administrativo II",
+  ],
+  "Desarrollar Excelente Personas Y Procesos": [
+    "Finalizar sistema de taller y repuestos en JD Edwards",
+    "Digitalizaci\u00f3n, simplificaci\u00f3n y estandarizaci\u00f3n de procesos e IA con SWAT team",
+    "Plan de Ahorro",
+    "Sistema de Financiamiento",
+    "Programa Top Talent (LEAP interno)",
+    "Habilitar canales alternos para recepci\u00f3n de pagos",
+    "Sistema de Capital Humano sin n\u00f3mina",
+    "Plan de mitigaci\u00f3n de salida de personal desarrollado (personas clave)",
+  ],
+};
+
+const capexTemplates = {
+  Mantenimiento: {
+    impactCategory: "No genera impacto economico",
+    projectGoal: "Mantener continuidad operativa, reducir obsolescencia y proteger niveles de servicio.",
+    projectLife: 5,
+    equipmentCost: 180000,
+    installationCost: 25000,
+    trainingCost: 8000,
+    otherCosts: 12000,
+    annualOpexIncrease: 15000,
+    annualCostSavings: 0,
+    riskAvoidanceBenefit: 0,
+    annualGrowthRate: 0,
+    residualPct: 0,
+    annualDepreciation: 45000,
+    salesUnitsYear1: 0,
+    ticketPrice: 0,
+    unitGrowthRate: 0,
+    variableCostPct: 0,
+    salesExpensePct: 0,
+    fixedCommercialCost: 0,
+    targetRoi: 20,
+    targetScore: 85,
+    strategicAlignment: 3,
+    operationalUrgency: 4,
+    riskReduction: 5,
+    executionReadiness: 4,
+    maltaProject: "Expansi\u00f3n CPD",
+    groupKpi: "Continuidad operacional",
+    strategicObjectives: ["Anticipar Y Gestionar Riesgos"],
+    strategyAlignmentText: "Cumplimiento regulatorio o continuidad del negocio",
+    problemSolvedText: "Obsolescencia de equipos o sistemas",
+    expectedImpactText: "Reduccion de riesgos",
+  },
+  Crecimiento: {
+    impactCategory: "Ventas",
+    projectGoal: "Incrementar ingresos, capacidad comercial y margen en lineas priorizadas.",
+    projectLife: 5,
+    equipmentCost: 320000,
+    installationCost: 55000,
+    trainingCost: 12000,
+    otherCosts: 28000,
+    annualOpexIncrease: 62000,
+    annualCostSavings: 0,
+    riskAvoidanceBenefit: 0,
+    annualGrowthRate: 4,
+    residualPct: 13.3,
+    annualDepreciation: 72000,
+    salesUnitsYear1: 1000,
+    ticketPrice: 220,
+    unitGrowthRate: 20,
+    variableCostPct: 47,
+    salesExpensePct: 20.7,
+    fixedCommercialCost: 78000,
+    targetRoi: 35,
+    targetScore: 85,
+    strategicAlignment: 5,
+    operationalUrgency: 4,
+    riskReduction: 3,
+    executionReadiness: 4,
+    maltaProject: "Venta Digital 3.0 (fortalecer canal digital)",
+    groupKpi: "Ventas / margen bruto",
+    strategicObjectives: "Consolidar Participaci\u00f3n En Mercado Automotriz",
+    strategyAlignmentText: "Crecimiento de ventas en lineas clave",
+    problemSolvedText: "Limitacion de capacidad instalada",
+    expectedImpactText: "Incremento de ingresos",
+  },
+  Estrategico: {
+    impactCategory: "Ahorro",
+    projectGoal: "Mejorar capacidades clave, productividad y trazabilidad para habilitar la estrategia del Grupo.",
+    projectLife: 5,
+    equipmentCost: 260000,
+    installationCost: 48000,
+    trainingCost: 18000,
+    otherCosts: 22000,
+    annualOpexIncrease: 42000,
+    annualCostSavings: 135000,
+    riskAvoidanceBenefit: 35000,
+    annualGrowthRate: 5,
+    residualPct: 6.6,
+    annualDepreciation: 65000,
+    salesUnitsYear1: 0,
+    ticketPrice: 0,
+    unitGrowthRate: 0,
+    variableCostPct: 0,
+    salesExpensePct: 0,
+    fixedCommercialCost: 0,
+    targetRoi: 30,
+    targetScore: 88,
+    strategicAlignment: 5,
+    operationalUrgency: 4,
+    riskReduction: 4,
+    executionReadiness: 4,
+    maltaProject: "Digitalizaci\u00f3n, simplificaci\u00f3n y estandarizaci\u00f3n de procesos e IA con SWAT team",
+    groupKpi: "Productividad operativa",
+    strategicObjectives: ["Desarrollar Excelente Personas Y Procesos"],
+    strategyAlignmentText: "Innovacion / transformacion digital",
+    problemSolvedText: "Falta de control / visibilidad de informacion",
+    expectedImpactText: "Mejora en tiempos de proceso",
+  },
+  Regulatorio: {
+    impactCategory: "No genera impacto economico",
+    projectGoal: "Asegurar cumplimiento, continuidad del negocio y mitigacion de riesgos obligatorios.",
+    projectLife: 5,
+    equipmentCost: 140000,
+    installationCost: 30000,
+    trainingCost: 10000,
+    otherCosts: 20000,
+    annualOpexIncrease: 18000,
+    annualCostSavings: 0,
+    riskAvoidanceBenefit: 0,
+    annualGrowthRate: 0,
+    residualPct: 0,
+    annualDepreciation: 40000,
+    salesUnitsYear1: 0,
+    ticketPrice: 0,
+    unitGrowthRate: 0,
+    variableCostPct: 0,
+    salesExpensePct: 0,
+    fixedCommercialCost: 0,
+    targetRoi: 15,
+    targetScore: 90,
+    strategicAlignment: 4,
+    operationalUrgency: 5,
+    riskReduction: 5,
+    executionReadiness: 4,
+    maltaProject: "Crear Depto. de Cumplimiento y Legal",
+    groupKpi: "Cumplimiento regulatorio",
+    strategicObjectives: ["Anticipar Y Gestionar Riesgos"],
+    strategyAlignmentText: "Cumplimiento regulatorio o continuidad del negocio",
+    problemSolvedText: "Riesgo operativo o incumplimiento",
+    expectedImpactText: "Cumplimiento normativo asegurado",
+  },
+};
+
+const helpMessages = {
+  projectType: "Selecciona el tipo de CAPEX. Cada tipo precarga supuestos base y umbrales de lectura distintos.",
+  impactCategory: "Define si el beneficio esperado viene por ventas, ahorro o una necesidad sin retorno economico directo.",
+  sponsor: "Sponsor / Driver es la persona que impulsa el caso y responde por la ejecucion ante ELE, Direccion Ejecutiva o Junta.",
+  maltaProject: "Vincula el CAPEX al proyecto Malta que mas se beneficia. Esto evita justificaciones escritas desde cero.",
+  groupKpi: "Selecciona el KPI del Grupo que recibira el impacto principal del proyecto.",
+  strategicObjectives: "Selecciona el objetivo estrategico del Grupo que el proyecto habilita.",
+  requiredInvestmentTotal: "Suma automaticamente equipos, instalacion, capacitacion y otros costos.",
+  residualPct: "Porcentaje de la inversion que se espera recuperar como valor residual al final de la vida util.",
+  annualDepreciation: "Depreciacion anual calculada como inversion menos valor residual, dividida entre la vida del proyecto.",
+  discountRate: "WACC fijado por Finanzas. Se usa para descontar los flujos y calcular VAN.",
+  taxRate: "Tasa fiscal corporativa fijada por Finanzas para estandarizar la evaluacion.",
+  requiredIrr: "TIR minima corporativa. El solicitante la ve, pero no la modifica.",
+  maxPayback: "Plazo maximo corporativo para recuperar la inversion.",
+  strategicAlignment: "Evalua que tan claro es el vinculo con la estrategia y prioridades del Grupo.",
+  operationalUrgency: "Mide la urgencia para continuidad, capacidad o cumplimiento.",
+  riskReduction: "Mide cuanto reduce exposicion operativa, regulatoria o reputacional.",
+  executionReadiness: "Mide si ya existen lider, alcance, fechas y capacidad de ejecutar.",
+};
+
+const metricHelp = {
+  VAN: "Valor actual neto: valor que crea o destruye el proyecto despues de descontar flujos al WACC.",
+  TIR: "Tasa interna de retorno: rendimiento anual implicito del proyecto.",
+  Payback: "Tiempo estimado para recuperar la inversion inicial.",
+  EBITDA: "Resultado operativo antes de intereses, impuestos, depreciacion y amortizacion.",
+  ROI: "Retorno total sobre la inversion inicial.",
+  WACC: "Costo promedio ponderado de capital definido por Finanzas.",
+};
+
+const stepDefinitions = [
+  { key: "type", label: "Tipo" },
+  { key: "cost", label: "Inversion" },
+  { key: "impact", label: "Impacto" },
+  { key: "assumptions", label: "Supuestos" },
+  { key: "result", label: "Resultado" },
+];
 
 const areaSponsorMap = {
   "Repuestos": "Miguel Sacasa",
@@ -94,11 +336,21 @@ const downloadPdfButton = document.getElementById("downloadPdf");
 const downloadExcelButton = document.getElementById("downloadExcel");
 const impactCategoryOptions = document.getElementById("impactCategoryOptions");
 const strategyOptions = document.getElementById("strategyOptions");
+const dashboard = document.querySelector(".dashboard");
+const wizardSteps = Array.from(document.querySelectorAll(".wizard-step"));
+const wizardStepsNav = document.querySelector(".wizard-steps");
+const wizardSections = Array.from(document.querySelectorAll("[data-step-section]"));
+const prevStepButton = document.getElementById("prevStep");
+const nextStepButton = document.getElementById("nextStep");
+const validationPanel = document.getElementById("validationPanel");
+const actionsPanel = document.querySelector(".actions");
 const statusNode = document.getElementById("evaluationStatus");
 const decisionBadge = document.getElementById("decisionBadge");
 const recommendationTag = document.getElementById("recommendationTag");
+const formFlowTitle = document.querySelector(".form-flow-title");
 let latestInput = null;
 let latestEvaluation = null;
+let currentWizardStep = 0;
 const LAST_CAPEX_STORAGE_KEY = "capex:lastRegistered";
 
 function getInputValue(id) {
@@ -110,7 +362,74 @@ function getInputValue(id) {
   return "";
 }
 
+function normalizeStrategicObjectiveValue(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  if (!value) {
+    return [];
+  }
+  return String(value)
+    .split(strategicObjectiveSeparator)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getStrategicObjectiveValues() {
+  return normalizeStrategicObjectiveValue(elements.strategicObjectives?.value || "");
+}
+
+function formatStrategicObjectives(value) {
+  const values = normalizeStrategicObjectiveValue(value);
+  return values.length ? values.join(", ") : "Sin seleccion";
+}
+
+function getMaltaProjectsForObjectives(value = getStrategicObjectiveValues()) {
+  const selectedObjectives = normalizeStrategicObjectiveValue(value);
+  const projects = [];
+  const seen = new Set();
+
+  selectedObjectives.forEach((objective) => {
+    (maltaProjectsByStrategicObjective[objective] || []).forEach((project) => {
+      if (seen.has(project)) return;
+      seen.add(project);
+      projects.push(project);
+    });
+  });
+
+  return projects;
+}
+
+function stripMaltaProjectNumber(value) {
+  return String(value || "").replace(/^\s*\d+\.\s*/, "");
+}
+
+function syncMaltaProjectOptions(preferredValue = "") {
+  const select = elements.maltaProject;
+  if (!select) return;
+
+  const projects = getMaltaProjectsForObjectives();
+  const cleanPreferredValue = stripMaltaProjectNumber(preferredValue);
+  select.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = projects.length ? "Seleccione una opcion" : "Seleccione un objetivo estrategico primero";
+  select.appendChild(placeholder);
+
+  projects.forEach((project) => {
+    const option = document.createElement("option");
+    option.value = project;
+    option.textContent = project;
+    select.appendChild(option);
+  });
+
+  select.value = projects.includes(cleanPreferredValue) ? cleanPreferredValue : "";
+}
+
 function getInputs() {
+  applyCorporateAssumptions();
+  syncRequiredInvestmentTotal();
   return {
     projectCode: getInputValue("projectCode"),
     projectName: getInputValue("projectName"),
@@ -118,6 +437,13 @@ function getInputs() {
     sponsor: getInputValue("sponsor"),
     impactCategory: getInputValue("impactCategory"),
     projectType: getInputValue("projectType"),
+    strategicFocus: getInputValue("strategicFocus"),
+    maltaProject: getInputValue("maltaProject"),
+    groupKpi: getInputValue("groupKpi"),
+    strategicObjectives: getInputValue("strategicObjectives"),
+    strategyAlignmentText: getInputValue("strategyAlignmentText"),
+    problemSolvedText: getInputValue("problemSolvedText"),
+    expectedImpactText: getInputValue("expectedImpactText"),
     projectGoal: getInputValue("projectGoal"),
     projectLife: Number(getInputValue("projectLife")),
     equipmentCost: Number(getInputValue("equipmentCost")),
@@ -127,6 +453,7 @@ function getInputs() {
     requiredInvestmentTotal: Number(getInputValue("requiredInvestmentTotal")),
     workingCapital: Number(getInputValue("workingCapital")),
     salvageValue: Number(getInputValue("salvageValue")),
+    residualPct: Number(getInputValue("residualPct")),
     implementationMonths: Number(getInputValue("implementationMonths")),
     annualRevenueIncrease: Number(getInputValue("annualRevenueIncrease")),
     annualCostSavings: Number(getInputValue("annualCostSavings")),
@@ -176,10 +503,23 @@ function restoreLastCapex() {
     if (!stored) return false;
     const parsed = JSON.parse(stored);
     if (!parsed?.input) return false;
+    const restoredType = normalizeCapexType(parsed.input.projectType);
 
     Object.entries(parsed.input).forEach(([id, value]) => {
       setFieldValue(id, value);
     });
+    setFieldValue("projectType", restoredType);
+    if (!parsed.input.strategicObjectives) {
+      setFieldValue("strategicObjectives", capexTemplates[restoredType]?.strategicObjectives || []);
+    }
+    if (parsed.input.residualPct === undefined || parsed.input.residualPct === "") {
+      setFieldValue("residualPct", capexTemplates[restoredType]?.residualPct ?? 0);
+    }
+    syncMaltaProjectOptions(parsed.input.maltaProject || capexTemplates[restoredType]?.maltaProject || "");
+    if (!elements.maltaProject.value && capexTemplates[restoredType]?.maltaProject) {
+      setFieldValue("maltaProject", capexTemplates[restoredType].maltaProject);
+    }
+    applyCorporateAssumptions();
     syncRequiredInvestmentTotal();
     syncImpactCategory(parsed.input.impactCategory || "Ventas");
     syncStrategicFocus(parsed.input.strategicFocus || "Ventas");
@@ -230,6 +570,17 @@ function syncRequiredInvestmentTotal() {
     Number(elements.trainingCost.value || 0) +
     Number(elements.otherCosts.value || 0);
   elements.requiredInvestmentTotal.value = total;
+  const residualPct = clamp(Number(elements.residualPct?.value || 0), 0, 100);
+  const projectLife = Math.max(1, Number(elements.projectLife?.value || 5));
+  const salvageValue = total * (residualPct / 100);
+  const annualDepreciation = Math.max(total - salvageValue, 0) / projectLife;
+
+  if (elements.salvageValue) {
+    elements.salvageValue.value = Math.round(salvageValue);
+  }
+  if (elements.annualDepreciation) {
+    elements.annualDepreciation.value = Math.round(annualDepreciation);
+  }
 }
 
 function syncStrategicFocus(value) {
@@ -254,6 +605,10 @@ function syncImpactCategory(value) {
 
 function applyImpactMode(value) {
   document.querySelectorAll("[data-impact]").forEach((element) => {
+    if (element.dataset.templateOnly === "true") {
+      element.hidden = true;
+      return;
+    }
     const modes = String(element.dataset.impact || "")
       .split(",")
       .map((item) => item.trim())
@@ -263,9 +618,385 @@ function applyImpactMode(value) {
 }
 
 function setFieldValue(id, value) {
-  if (elements[id]) {
-    elements[id].value = value;
+  if (id === "strategicObjectives") {
+    const selectedValues = normalizeStrategicObjectiveValue(value);
+    if (elements.strategicObjectives) {
+      elements.strategicObjectives.value = selectedValues[0] || "";
+    }
+    syncMaltaProjectOptions(elements.maltaProject?.value || "");
+    return;
   }
+  if (elements[id]) {
+    elements[id].value = id === "maltaProject" ? stripMaltaProjectNumber(value) : value;
+  }
+}
+
+function normalizeCapexType(value) {
+  return capexTemplates[value] ? value : (legacyProjectTypeMap[value] || "Crecimiento");
+}
+
+function applyCorporateAssumptions() {
+  Object.entries(corporateAssumptions).forEach(([id, value]) => {
+    const element = elements[id];
+    if (!element) return;
+    element.value = value;
+    element.readOnly = true;
+    element.dataset.corporate = "true";
+    element.setAttribute("aria-readonly", "true");
+  });
+}
+
+function applyCapexTemplate(type, options = {}) {
+  const selectedType = normalizeCapexType(type);
+  const template = capexTemplates[selectedType] || capexTemplates.Crecimiento;
+
+  setFieldValue("projectType", selectedType);
+  Object.entries(template).forEach(([id, value]) => {
+    setFieldValue(id, value);
+  });
+  syncMaltaProjectOptions(template.maltaProject);
+  setFieldValue("maltaProject", template.maltaProject);
+
+  applyCorporateAssumptions();
+  syncRequiredInvestmentTotal();
+  syncImpactCategory(template.impactCategory);
+
+  if (options.updateStatus !== false && statusNode) {
+    statusNode.textContent = `Plantilla "${projectTypeLabels[selectedType]}" aplicada.`;
+  }
+}
+
+function attachHelpDots() {
+  Object.entries(helpMessages).forEach(([id, message]) => {
+    if (elements[id]) {
+      elements[id].title = message;
+    }
+  });
+
+  document.querySelectorAll("label").forEach((label) => {
+    const control = label.querySelector("input[id], select[id], textarea[id]");
+    const textNode = label.querySelector("span");
+    if (
+      !control ||
+      control.dataset.corporate === "true" ||
+      !textNode ||
+      !helpMessages[control.id] ||
+      textNode.querySelector(".help-dot")
+    ) {
+      return;
+    }
+
+    const help = document.createElement("span");
+    help.className = "help-dot";
+    help.tabIndex = 0;
+    help.textContent = "?";
+    help.title = helpMessages[control.id];
+    textNode.appendChild(help);
+  });
+}
+
+function hideTemplateOnlyGovernanceRows() {
+  ["strategyAlignmentText", "problemSolvedText", "expectedImpactText"].forEach((id) => {
+    const row = elements[id]?.closest("tr");
+    if (row) row.hidden = true;
+  });
+}
+
+function setWizardStep(index) {
+  const safeIndex = clamp(index, 0, Math.max(wizardSteps.length - 1, 0));
+  const selectedStep = wizardSteps[safeIndex]?.dataset.step || "type";
+  const isResultStep = selectedStep === "result";
+  currentWizardStep = safeIndex;
+
+  wizardSteps.forEach((button, buttonIndex) => {
+    button.classList.toggle("active", buttonIndex === safeIndex);
+    button.classList.toggle("done", buttonIndex < safeIndex);
+    button.setAttribute("aria-current", buttonIndex === safeIndex ? "step" : "false");
+  });
+
+  wizardSections.forEach((section) => {
+    section.hidden = section.dataset.stepSection !== selectedStep;
+  });
+
+  if (wizardStepsNav) {
+    wizardStepsNav.hidden = isResultStep;
+  }
+  if (formFlowTitle) {
+    formFlowTitle.textContent = isResultStep
+      ? "Alertas y Cumplimiento del Proyecto"
+      : "Completa el Formulario por Etapas";
+  }
+  if (prevStepButton) {
+    prevStepButton.disabled = safeIndex === 0;
+  }
+  if (nextStepButton) {
+    if (safeIndex === wizardSteps.length - 2) {
+      nextStepButton.textContent = "Evaluar";
+    } else if (safeIndex === wizardSteps.length - 1) {
+      nextStepButton.textContent = "Actualizar evaluacion";
+    } else {
+      nextStepButton.textContent = "Siguiente";
+    }
+  }
+  if (dashboard) {
+    dashboard.classList.toggle("show-results", isResultStep);
+  }
+  if (actionsPanel) {
+    actionsPanel.hidden = !isResultStep;
+  }
+  if (isResultStep) {
+    evaluateProject({ persist: false });
+  }
+}
+
+function getValidationMessages(input, evaluation) {
+  const messages = [];
+  const add = (tone, title, detail) => messages.push({ tone, title, detail });
+  const totalSalesCostPct = input.variableCostPct + input.salesExpensePct;
+  const selectedStep = wizardSteps[currentWizardStep]?.dataset.step || "type";
+
+  if (selectedStep === "type") {
+    if (!String(input.projectName || "").trim()) {
+      add("warning", "Nombre pendiente", "Agrega un nombre de proyecto para continuar.");
+    }
+    if (!String(input.sponsor || "").trim()) {
+      add("warning", "Sponsor / Driver pendiente", "Indica quien impulsa y responde por el caso.");
+    }
+    if (!input.maltaProject) {
+      add("warning", "Proyecto Malta pendiente", "Selecciona el Proyecto Malta Asociado.");
+    }
+    if (!input.groupKpi) {
+      add("warning", "KPI Grupo pendiente", "Selecciona el KPI Grupo que Impacta.");
+    }
+    if (!input.strategicObjectives.length) {
+      add("warning", "Objetivo estrategico pendiente", "Selecciona el objetivo estrategico del Grupo.");
+    }
+    if (!String(input.projectGoal || "").trim()) {
+      add("warning", "Objetivo pendiente", "Resume el objetivo del proyecto.");
+    }
+    return messages;
+  }
+
+  if (selectedStep === "cost") {
+    if (evaluation.totalInvestment <= 0) {
+      add("danger", "Inversion sin monto", "El CAPEX debe tener al menos un costo inicial mayor que cero.");
+    }
+    ["equipmentCost", "installationCost", "trainingCost", "otherCosts"].forEach((id) => {
+      if (Number(getInputValue(id)) < 0) {
+        add("danger", "Monto invalido", "Los costos de inversion no pueden ser negativos.");
+      }
+    });
+    return messages.slice(0, 4);
+  }
+
+  if (selectedStep === "impact") {
+    if (input.impactCategory === "Ventas") {
+      if (input.salesUnitsYear1 <= 0 || input.ticketPrice <= 0) {
+        add("danger", "Ventas incompletas", "Para ventas, unidades y precio promedio deben ser mayores que cero.");
+      }
+      if (totalSalesCostPct >= 100) {
+        add("danger", "Margen negativo", "Costo variable mas gasto de ventas debe ser menor que 100%.");
+      }
+      if (evaluation.breakEvenMonthlyUnits && input.salesUnitsYear1 / 12 < evaluation.breakEvenMonthlyUnits) {
+        add("warning", "Punto de equilibrio alto", "Las unidades esperadas del ano 1 no cubren el punto de equilibrio mensual.");
+      }
+    }
+    if (input.impactCategory === "Ahorro" && input.annualCostSavings + input.riskAvoidanceBenefit <= input.annualOpexIncrease) {
+      add("warning", "Ahorro insuficiente", "Los ahorros y riesgos evitados no superan el opex incremental estimado.");
+    }
+    return messages.slice(0, 4);
+  }
+
+  if (selectedStep === "assumptions") {
+    const residualPct = Number(getInputValue("residualPct"));
+    if (residualPct < 0 || residualPct > 100) {
+      add("warning", "Residual fuera de rango", "El valor residual debe estar entre 0% y 100%.");
+    }
+    ["strategicAlignment", "operationalUrgency", "riskReduction", "executionReadiness"].forEach((id) => {
+      const value = Number(getInputValue(id));
+      if (value < 1 || value > 5) {
+        add("warning", "Score fuera de rango", "Usa una escala de 1 a 5 en los supuestos cualitativos.");
+      }
+    });
+    return messages.slice(0, 4);
+  }
+
+  if (!String(input.projectName || "").trim()) {
+    add("warning", "Nombre pendiente", "Agrega un nombre de proyecto antes de enviarlo a aprobacion.");
+  }
+  if (!input.maltaProject) {
+    add("warning", "Falta vinculo Malta", "Selecciona el proyecto Malta al que contribuye este CAPEX.");
+  }
+  if (!input.groupKpi) {
+    add("warning", "Falta KPI del Grupo", "Selecciona el KPI principal que recibira el impacto del proyecto.");
+  }
+  if (!input.strategicObjectives.length) {
+    add("warning", "Falta objetivo estrategico", "Selecciona el objetivo estrategico del Grupo.");
+  }
+  if (evaluation.totalInvestment <= 0) {
+    add("danger", "Inversion sin monto", "El CAPEX debe tener al menos un costo inicial mayor que cero.");
+  }
+  if (input.impactCategory === "Ventas") {
+    if (input.salesUnitsYear1 <= 0 || input.ticketPrice <= 0) {
+      add("danger", "Ventas incompletas", "Para un CAPEX de crecimiento, unidades y precio promedio deben ser mayores que cero.");
+    }
+    if (totalSalesCostPct >= 100) {
+      add("danger", "Margen negativo", "Costo variable mas gasto de ventas no deberia llegar a 100% de ventas.");
+    }
+    if (evaluation.breakEvenMonthlyUnits && input.salesUnitsYear1 / 12 < evaluation.breakEvenMonthlyUnits) {
+      add("warning", "Punto de equilibrio alto", "Las unidades esperadas del ano 1 no cubren el punto de equilibrio mensual.");
+    }
+  }
+  if (input.impactCategory === "Ahorro" && input.annualCostSavings + input.riskAvoidanceBenefit <= input.annualOpexIncrease) {
+    add("warning", "Ahorro insuficiente", "Los ahorros y riesgos evitados no superan el opex incremental estimado.");
+  }
+  if (input.impactCategory !== "No genera impacto economico") {
+    if (evaluation.npv < 0) {
+      add("danger", "VAN negativo", "Con el WACC corporativo, el proyecto destruye valor financiero.");
+    } else {
+      add("success", "VAN positivo", "El proyecto crea valor financiero despues de descontar los flujos al WACC.");
+    }
+    if ((evaluation.irrPct || 0) < input.requiredIrr) {
+      add("warning", "TIR bajo minimo", "La TIR queda por debajo del umbral fijado por Finanzas.");
+    } else {
+      add("success", "TIR cumple minimo", "La rentabilidad esperada supera el umbral corporativo de Finanzas.");
+    }
+    if (evaluation.payback === null || evaluation.payback > input.maxPayback) {
+      add("warning", "Payback fuera de politica", "La recuperacion supera el maximo corporativo visible para el solicitante.");
+    } else {
+      add("success", "Payback dentro de politica", "La inversion se recupera dentro del plazo corporativo esperado.");
+    }
+  }
+  if (evaluation.score >= input.targetScore) {
+    add("success", "Score ejecutivo solido", "La valoracion cualitativa alcanza la meta definida para el tipo de CAPEX.");
+  } else {
+    add("warning", "Score por reforzar", "La valoracion cualitativa queda debajo de la meta esperada.");
+  }
+
+  return messages.slice(0, 5);
+}
+
+function renderValidationMessages(input, evaluation) {
+  if (!validationPanel) return;
+
+  const messages = getValidationMessages(input, evaluation);
+  if (!messages.length) {
+    validationPanel.innerHTML = "";
+    return;
+  }
+
+  validationPanel.innerHTML = messages
+    .map(
+      (message) => `
+        <div class="validation-item ${message.tone}" title="${message.detail}">
+          <strong>${message.title}</strong>
+          <span>${message.detail}</span>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function clearFieldErrors() {
+  document.querySelectorAll(".field-error").forEach((node) => node.remove());
+  document.querySelectorAll(".field-invalid").forEach((node) => node.classList.remove("field-invalid"));
+}
+
+function setFieldError(id, message) {
+  const element = elements[id] || document.getElementById(id);
+  if (!element) return;
+
+  const target = id === "impactCategory"
+    ? impactCategoryOptions
+    : id === "strategicObjectives"
+      ? elements.strategicObjectives
+      : element;
+  target.classList.add("field-invalid");
+
+  const container = target.closest("label") || target.closest("fieldset") || target.parentElement;
+  if (!container || container.querySelector(".field-error")) return;
+
+  const error = document.createElement("span");
+  error.className = "field-error";
+  error.textContent = message;
+  container.appendChild(error);
+}
+
+function validateCurrentStep() {
+  clearFieldErrors();
+  const input = getInputs();
+  const messages = [];
+  const add = (id, message) => {
+    messages.push(message);
+    setFieldError(id, message);
+  };
+  const selectedStep = wizardSteps[currentWizardStep]?.dataset.step || "type";
+
+  if (selectedStep === "type") {
+    if (!input.projectType) add("projectType", "Selecciona el tipo de CAPEX.");
+    if (!String(input.projectName || "").trim()) add("projectName", "Ingresa el nombre del proyecto.");
+    if (!input.businessArea) add("businessArea", "Selecciona el area solicitante.");
+    if (!String(input.sponsor || "").trim()) add("sponsor", "Indica el Sponsor / Driver.");
+    if (!input.maltaProject) add("maltaProject", "Selecciona el Proyecto Malta Asociado.");
+    if (!input.groupKpi) add("groupKpi", "Selecciona el KPI Grupo que Impacta.");
+    if (!input.strategicObjectives.length) add("strategicObjectives", "Selecciona el objetivo estrategico.");
+    if (!String(input.projectGoal || "").trim()) add("projectGoal", "Resume el objetivo del proyecto.");
+  }
+
+  if (selectedStep === "cost") {
+    if (input.requiredInvestmentTotal <= 0) {
+      add("requiredInvestmentTotal", "La inversion total debe ser mayor que cero.");
+    }
+    ["equipmentCost", "installationCost", "trainingCost", "otherCosts"].forEach((id) => {
+      if (Number(getInputValue(id)) < 0) add(id, "El monto no puede ser negativo.");
+    });
+  }
+
+  if (selectedStep === "impact") {
+    if (!input.impactCategory) add("impactCategory", "Selecciona ventas, ahorro o sin impacto economico.");
+    if (input.impactCategory === "Ventas") {
+      if (input.salesUnitsYear1 <= 0) add("salesUnitsYear1", "Ingresa unidades estimadas mayores que cero.");
+      if (input.ticketPrice <= 0) add("ticketPrice", "Ingresa un precio promedio mayor que cero.");
+      if (input.variableCostPct + input.salesExpensePct >= 100) {
+        add("salesExpensePct", "Costo variable mas gasto de ventas debe ser menor a 100%.");
+      }
+    }
+    if (input.impactCategory === "Ahorro" && input.annualCostSavings <= 0 && input.riskAvoidanceBenefit <= 0) {
+      add("annualCostSavings", "Indica el ahorro o beneficio por riesgo evitado.");
+    }
+  }
+
+  if (selectedStep === "assumptions") {
+    const residualPct = Number(getInputValue("residualPct"));
+    if (residualPct < 0 || residualPct > 100) add("residualPct", "Usa un residual entre 0% y 100%.");
+    ["strategicAlignment", "operationalUrgency", "riskReduction", "executionReadiness"].forEach((id) => {
+      const value = Number(getInputValue(id));
+      if (value < 1 || value > 5) add(id, "Usa una escala de 1 a 5.");
+    });
+  }
+
+  if (messages.length) {
+    if (validationPanel) {
+      validationPanel.innerHTML = messages
+        .map(
+          (message) => `
+            <div class="validation-item warning">
+              <strong>Completa esta seccion</strong>
+              <span>${message}</span>
+            </div>
+          `
+        )
+        .join("");
+    }
+    statusNode.textContent = messages[0];
+    return false;
+  }
+
+  if (validationPanel) {
+    validationPanel.innerHTML = "";
+  }
+  statusNode.textContent = "Paso validado.";
+  return true;
 }
 
 function startNewCapex() {
@@ -273,8 +1004,11 @@ function startNewCapex() {
     projectName: "",
     businessArea: "Repuestos",
     impactCategory: "Ventas",
-    projectType: "productivity",
+    projectType: "Crecimiento",
     projectGoal: "",
+    maltaProject: "",
+    groupKpi: "",
+    strategicObjectives: [],
     strategyAlignmentText: "",
     problemSolvedText: "",
     expectedImpactText: "",
@@ -285,6 +1019,7 @@ function startNewCapex() {
     otherCosts: 0,
     workingCapital: 0,
     salvageValue: 0,
+    residualPct: 0,
     implementationMonths: 6,
     annualRevenueIncrease: 0,
     annualCostSavings: 0,
@@ -299,9 +1034,9 @@ function startNewCapex() {
     fixedCommercialCost: 78000,
     annualDepreciation: 0,
     discountRate: 12,
-    taxRate: 30,
+    taxRate: 32,
     requiredIrr: 15,
-    maxPayback: 4,
+    maxPayback: 5,
     targetRoi: 35,
     targetScore: 85,
     strategicAlignment: 3,
@@ -312,9 +1047,8 @@ function startNewCapex() {
 
   Object.entries(defaults).forEach(([id, value]) => setFieldValue(id, value));
   syncSponsorByArea();
-  syncRequiredInvestmentTotal();
-  syncImpactCategory("Ventas");
-  syncStrategicFocus("Ventas");
+  applyCapexTemplate("Crecimiento", { updateStatus: false });
+  setWizardStep(0);
   evaluateProject({ persist: false });
   window.setTimeout(() => {
     statusNode.textContent = "Nuevo CAPEX listo para ingresar.";
@@ -466,15 +1200,24 @@ function calculateScore(input, metrics) {
   const qualitativeScore =
     (input.strategicAlignment / 5) * 12 +
     (input.operationalUrgency / 5) * 8 +
-    (input.riskReduction / 5) * 6 +
+    (input.riskReduction / 5) * 10 +
     (input.executionReadiness / 5) * 6 +
     clamp((18 - input.implementationMonths) / 18, 0, 1) * 6;
 
+  const financialBase = clamp((financialScore / 68) * 100, 0, 100);
+  const qualitativeBase = clamp((qualitativeScore / 42) * 100, 0, 100);
+  const weights = {
+    Crecimiento: [0.75, 0.25],
+    Mantenimiento: [0.35, 0.65],
+    Estrategico: [0.45, 0.55],
+    Regulatorio: [0.15, 0.85],
+  }[normalizeCapexType(input.projectType)] || [0.65, 0.35];
+
   if (input.impactCategory === "No genera impacto economico") {
-    return clamp((qualitativeScore / 38) * 100, 0, 100);
+    return clamp(qualitativeBase * 0.92 + (input.riskReduction / 5) * 8, 0, 100);
   }
 
-  return clamp(financialScore + qualitativeScore, 0, 100);
+  return clamp(financialBase * weights[0] + qualitativeBase * weights[1], 0, 100);
 }
 
 function buildCashFlows(input) {
@@ -664,7 +1407,7 @@ function buildEvaluation(input) {
 
   const scoreRows = [
     {
-      label: "Score integral",
+      label: "Score",
       value: score,
       display: `${number(score, 0)} / 100`,
       helper: `Meta ${number(input.targetScore, 0)}%`,
@@ -774,13 +1517,61 @@ function buildRecommendation(input, metrics) {
     input.impactCategory === "Ventas" &&
     metrics.breakEvenUnits &&
     input.salesUnitsYear1 < metrics.breakEvenUnits;
+  const capexType = normalizeCapexType(input.projectType);
+  const highRiskOrCompliance = input.riskReduction >= 4 && input.operationalUrgency >= 4;
+  const strongStrategicCase = input.strategicAlignment >= 4 && input.executionReadiness >= 4;
+
+  if (capexType === "Regulatorio") {
+    if (metrics.score >= input.targetScore * 0.85 && highRiskOrCompliance) {
+      lead.push("El CAPEX regulatorio se justifica por cumplimiento, reduccion de riesgo y obligatoriedad, aunque el retorno financiero directo sea bajo.");
+      actions.push("Aprobar sujeto a evidencia del requerimiento regulatorio, fecha limite y Sponsor / Driver de cumplimiento.");
+      actions.push("Documentar el riesgo de no ejecutar y el control que quedara implementado.");
+      actions.push("Mantener seguimiento de cumplimiento y cierre post-implementacion con Finanzas y el Sponsor / Driver.");
+      return { label: "APROBAR", tone: "success", lead: lead.join(" "), actions };
+    }
+
+    lead.push("El CAPEX regulatorio requiere mas evidencia antes de aprobarse como obligatorio.");
+    actions.push("Adjuntar sustento normativo, fecha de exigibilidad y consecuencias de no ejecutar.");
+    actions.push("Revisar alcance minimo viable para cumplir sin sobredimensionar la inversion.");
+    actions.push("Confirmar Sponsor / Driver y lider de cierre de cumplimiento.");
+    return { label: "REVISAR", tone: "warning", lead: lead.join(" "), actions };
+  }
+
+  if (capexType === "Mantenimiento") {
+    if (metrics.score >= input.targetScore * 0.85 && (highRiskOrCompliance || metrics.npv >= -metrics.totalInvestment * 0.2)) {
+      lead.push("El CAPEX de mantenimiento prioriza continuidad operativa, reduccion de riesgos y estabilidad del servicio; no depende exclusivamente de VAN positivo.");
+      actions.push("Aprobar si el Sponsor / Driver documenta criticidad, riesgo evitado y plan de ejecucion.");
+      actions.push("Comparar contra alternativa de reparar, arrendar o diferir para confirmar el alcance recomendado.");
+      actions.push("Definir indicadores de continuidad y disponibilidad para medir el beneficio posterior.");
+      return { label: "APROBAR", tone: "success", lead: lead.join(" "), actions };
+    }
+
+    lead.push("La necesidad de mantenimiento es atendible, pero requiere reforzar criticidad o ajustar el alcance.");
+    actions.push("Cuantificar paros evitados, fallas recurrentes o impacto en continuidad operativa.");
+    actions.push("Revisar si existe una fase inicial de menor costo que cubra el riesgo principal.");
+    return { label: "REVISAR", tone: "warning", lead: lead.join(" "), actions };
+  }
+
+  if (capexType === "Estrategico") {
+    if (metrics.score >= input.targetScore * 0.9 && strongStrategicCase && metrics.npv >= -metrics.totalInvestment * 0.1) {
+      lead.push("El CAPEX estrategico tiene respaldo cualitativo fuerte y habilita prioridades del Grupo, por lo que puede avanzar aunque el retorno financiero sea moderado.");
+      actions.push("Aprobar con hitos de valor, Sponsor / Driver definido y medicion contra el KPI estrategico seleccionado.");
+      actions.push("Mantener control de alcance para proteger el VAN y la capacidad de ejecucion.");
+      return { label: "APROBAR", tone: "success", lead: lead.join(" "), actions };
+    }
+
+    lead.push("El CAPEX estrategico necesita fortalecer alineacion, evidencia o plan de ejecucion antes de aprobarse.");
+    actions.push("Precisar contribucion al proyecto Malta y al KPI del Grupo seleccionado.");
+    actions.push("Dividir en fases si el retorno financiero o la ejecucion aun tienen incertidumbre.");
+    return { label: "REVISAR", tone: "warning", lead: lead.join(" "), actions };
+  }
 
   if (input.impactCategory === "No genera impacto economico") {
     if (meetsScore) {
       lead.push("El CAPEX no genera retorno directo, pero el score cualitativo respalda la necesidad por continuidad, cumplimiento o reduccion de riesgo.");
       actions.push("Aprobar con una justificacion ejecutiva enfocada en riesgo, continuidad operacional y obligatoriedad del proyecto.");
       actions.push("Documentar el costo de no ejecutar y los indicadores no financieros que se van a proteger.");
-      actions.push("Definir responsables, fecha objetivo y evidencia de cumplimiento para el cierre post-implementacion.");
+      actions.push("Definir Sponsor / Driver, fecha objetivo y evidencia de cumplimiento para el cierre post-implementacion.");
       return { label: "APROBAR", tone: "success", lead: lead.join(" "), actions };
     }
 
@@ -788,7 +1579,7 @@ function buildRecommendation(input, metrics) {
       lead.push("El CAPEX tiene una necesidad cualitativa razonable, pero requiere reforzar evidencias antes de pasar a aprobacion.");
       actions.push("Completar la justificacion de continuidad, cumplimiento o riesgo con datos verificables.");
       actions.push("Revisar si el alcance puede reducirse sin comprometer la necesidad critica.");
-      actions.push("Aprobar condicionalmente solo si el area responsable documenta consecuencias, fechas y controles.");
+      actions.push("Aprobar condicionalmente solo si el Sponsor / Driver documenta consecuencias, fechas y controles.");
       return { label: "REVISAR", tone: "warning", lead: lead.join(" "), actions };
     }
 
@@ -835,7 +1626,7 @@ function buildRecommendation(input, metrics) {
       actions.push("Revisar si la ejecucion puede dividirse en fases para bajar el riesgo de una implementacion extensa.");
     }
 
-    actions.push("Aprobar condicionalmente solo si se documentan los ajustes y responsables.");
+    actions.push("Aprobar condicionalmente solo si se documentan los ajustes y el Sponsor / Driver.");
     return { label: "REVISAR", tone: "warning", lead: lead.join(" "), actions };
   }
 
@@ -855,8 +1646,8 @@ function buildRecommendation(input, metrics) {
 function renderHeadline(input) {
   document.getElementById("projectHeadline").textContent = input.projectName || "Proyecto CAPEX";
   document.getElementById("areaHeadline").textContent = input.businessArea || "Sin area";
-  document.getElementById("sponsorHeadline").textContent = input.sponsor || "Sin responsable";
-  document.getElementById("typeHeadline").textContent = input.impactCategory || "Ventas";
+  document.getElementById("sponsorHeadline").textContent = input.sponsor || "Sin Sponsor / Driver";
+  document.getElementById("typeHeadline").textContent = projectTypeLabels[input.projectType] || input.projectType || "Crecimiento";
 }
 
 function statusAbove(value, target, limitFactor = 0.9) {
@@ -921,7 +1712,7 @@ function renderCards(evaluation) {
     ],
   }[evaluation.impactCategory] || [];
 
-  const cards = [
+  const heroCards = [
     {
       label: "Inversion total",
       value: currency(evaluation.totalInvestment),
@@ -947,6 +1738,15 @@ function renderCards(evaluation) {
       status: statusBelow(evaluation.payback, Number(elements.maxPayback.value), 1.15),
     },
     {
+      label: "Score",
+      value: `${number(evaluation.score, 0)} / 100`,
+      subtext: `Meta ${number(Number(elements.targetScore.value), 0)}%`,
+      status: statusAbove(evaluation.score, Number(elements.targetScore.value), 0.9),
+    },
+  ];
+
+  const detailCards = [
+    {
       label: "ROI",
       value: percent(evaluation.roi),
       subtext: `Meta ${percent(Number(elements.targetRoi.value))}`,
@@ -971,30 +1771,39 @@ function renderCards(evaluation) {
       status: evaluation.annualAverageFlow >= 0 ? "success" : "danger",
     },
     {
-      label: "Score",
-      value: `${number(evaluation.score, 0)} / 100`,
-      subtext: `Meta ${number(Number(elements.targetScore.value), 0)}%`,
-      status: statusAbove(evaluation.score, Number(elements.targetScore.value), 0.9),
+      label: "Tipo de impacto",
+      value: evaluation.impactCategory || "Ventas",
+      subtext: projectTypeLabels[elements.projectType.value] || elements.projectType.value,
+      status: "neutral",
     },
     ...categoryCards,
   ];
 
+  const renderMetricCard = (card, className) => {
+    const helpKey = Object.keys(metricHelp).find((key) => card.label.includes(key));
+    const help = helpKey ? metricHelp[helpKey] : "";
+    return `
+      <article class="metric-card ${card.status || "neutral"} ${className}" ${help ? `title="${help}"` : ""}>
+        <p class="metric-label">${card.label}${help ? '<span class="metric-help">?</span>' : ""}</p>
+        <p class="metric-value">${card.value}</p>
+        <p class="metric-subtext">${card.subtext}</p>
+      </article>
+    `;
+  };
+
   const container = document.getElementById("metricCards");
-  container.innerHTML = cards
-    .map(
-      (card) => `
-        <article class="metric-card ${card.status || "neutral"}">
-          <p class="metric-label">${card.label}</p>
-          <p class="metric-value">${card.value}</p>
-          <p class="metric-subtext">${card.subtext}</p>
-        </article>
-      `
-    )
-    .join("");
+  container.innerHTML = heroCards.map((card) => renderMetricCard(card, "hero-metric")).join("");
+
+  const detailContainer = document.getElementById("detailMetricCards");
+  if (detailContainer) {
+    detailContainer.innerHTML = detailCards.map((card) => renderMetricCard(card, "detail-metric")).join("");
+  }
 }
 
 function renderProgressRows(containerId, rows) {
   const container = document.getElementById(containerId);
+  if (!container) return;
+
   container.innerHTML = rows
     .map(
       (row) => `
@@ -1025,8 +1834,10 @@ function renderValueBridge(rows) {
 }
 
 function renderRecommendation(recommendation) {
-  decisionBadge.textContent = recommendation.label;
-  decisionBadge.className = `decision-badge ${recommendation.tone}`;
+  if (decisionBadge) {
+    decisionBadge.textContent = recommendation.label;
+    decisionBadge.className = `decision-badge ${recommendation.tone}`;
+  }
   recommendationTag.textContent = recommendation.label;
   recommendationTag.className = `mini-tag recommendation-status ${recommendation.tone}`;
   const summary = [recommendation.lead, ...recommendation.actions.slice(0, 3)].join(" ");
@@ -1346,10 +2157,10 @@ async function buildExecutivePdf(input, evaluation) {
   strokeRect(42, 532, 528, 92, "#d9e1ea", 0.7);
   sectionTitle("Datos generales del proyecto", 58, 606);
   dataField("Área solicitante", input.businessArea, 58, 584, 110);
-  dataField("Responsable", input.sponsor, 184, 584, 110);
-  dataField("Categoría", projectTypeLabels[input.projectType] || input.projectType, 310, 584, 108);
+  dataField("Sponsor / Driver", input.sponsor, 184, 584, 110);
+  dataField("Tipo CAPEX", projectTypeLabels[input.projectType] || input.projectType, 310, 584, 108);
   dataField("Horizonte", `${number(input.projectLife, 0)} años`, 436, 584, 90);
-  dataField("Impacto CAPEX", input.impactCategory || "Ventas", 58, 552, 150);
+  dataField("Impacto economico", input.impactCategory || "Ventas", 58, 552, 150);
   dataField("Objetivo", input.projectGoal, 226, 552, 300);
 
   fillRect(42, 442, 528, 74, "#ffffff");
@@ -1368,9 +2179,7 @@ async function buildExecutivePdf(input, evaluation) {
     ["VAN", currency(evaluation.npv), evaluation.npv >= 0 ? "#1f5fa8" : "#cc4f62"],
     ["TIR", evaluation.irrPct ? percent(evaluation.irrPct) : "No calculable", "#4771d6"],
     ["Payback", evaluation.payback === null ? "No recupera" : `${number(evaluation.payback, 1)} años`, "#7ea3ff"],
-    ["ROI", percent(evaluation.roi), evaluation.roi >= input.targetRoi ? "#1f5fa8" : "#cc4f62"],
-    ["EVA anual", currency(evaluation.eva), evaluation.eva >= 0 ? "#1f5fa8" : "#cc4f62"],
-    ["Score integral", `${number(evaluation.score, 0)} / 100`, evaluation.score >= input.targetScore ? "#1f5fa8" : "#cc4f62"],
+    ["Score", `${number(evaluation.score, 0)} / 100`, evaluation.score >= input.targetScore ? "#1f5fa8" : "#cc4f62"],
     impactKpi,
   ];
   kpis.forEach(([label, value, color], index) => {
@@ -1490,11 +2299,11 @@ async function buildDetailedExecutivePdf(input, evaluation) {
     ["VAN", currency(evaluation.npv), `Tasa ${percent(input.discountRate)}`, evaluation.npv >= 0 ? "success" : "danger"],
     ["TIR", evaluation.irrPct ? percent(evaluation.irrPct) : "No calculable", `Min. ${percent(input.requiredIrr)}`, statusAbove(evaluation.irrPct || 0, input.requiredIrr, 0.9)],
     ["Payback", evaluation.payback === null ? "No recupera" : `${number(evaluation.payback, 1)} anos`, `Max. ${number(input.maxPayback, 1)} anos`, statusBelow(evaluation.payback, input.maxPayback, 1.15)],
+    ["Score", `${number(evaluation.score, 0)} / 100`, `Meta ${number(input.targetScore, 0)}%`, statusAbove(evaluation.score, input.targetScore, 0.9)],
     ["ROI", percent(evaluation.roi), `Meta ${percent(input.targetRoi)}`, statusAbove(evaluation.roi, input.targetRoi, 0.85)],
     ["EVA anual", currency(evaluation.eva), "Costo capital", evaluation.eva >= 0 ? "success" : "danger"],
     ["EBITDA prom.", currency(evaluation.ebitdaAverage || 0), "Potencial operativo", evaluation.ebitdaAverage >= 0 ? "success" : "danger"],
     ["Beneficio prom.", currency(evaluation.annualAverageFlow || 0), "Flujo neto anual", evaluation.annualAverageFlow >= 0 ? "success" : "danger"],
-    ["Score", `${number(evaluation.score, 0)} / 100`, `Meta ${number(input.targetScore, 0)}%`, statusAbove(evaluation.score, input.targetScore, 0.9)],
   ];
 
   if (input.impactCategory === "Ventas") {
@@ -1518,14 +2327,17 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   field(page1, "Codigo unico del proyecto", input.projectCode, margin + 14, 675, 230);
   field(page1, "Decision sugerida", evaluation.recommendation.label, margin + 380, 675, 120);
 
-  fillRect(page1, margin, 548, contentWidth, 80, "#ffffff");
-  strokeRect(page1, margin, 548, contentWidth, 80);
+  fillRect(page1, margin, 528, contentWidth, 100, "#ffffff");
+  strokeRect(page1, margin, 528, contentWidth, 100);
   sectionTitle(page1, "Datos generales", margin + 14, 612);
   field(page1, "Area", input.businessArea, margin + 14, 590, 108);
-  field(page1, "Responsable", input.sponsor, margin + 140, 590, 120);
-  field(page1, "Impacto CAPEX", input.impactCategory || "Ventas", margin + 276, 590, 120);
+  field(page1, "Sponsor / Driver", input.sponsor, margin + 140, 590, 120);
+  field(page1, "Tipo CAPEX", projectTypeLabels[input.projectType] || input.projectType, margin + 276, 590, 120);
   field(page1, "Horizonte", `${number(input.projectLife, 0)} anos`, margin + 418, 590, 70);
-  field(page1, "Objetivo", input.projectGoal, margin + 14, 562, 500, 2);
+  field(page1, "Proyecto Malta", input.maltaProject, margin + 14, 562, 170, 1);
+  field(page1, "KPI Grupo", input.groupKpi, margin + 204, 562, 120, 1);
+  field(page1, "Objetivo Estrategico", formatStrategicObjectives(input.strategicObjectives), margin + 340, 562, 172, 1);
+  field(page1, "Objetivo", input.projectGoal, margin + 14, 542, 500, 1);
 
   fillRect(page1, margin, 462, contentWidth, 66, "#ffffff");
   strokeRect(page1, margin, 462, contentWidth, 66);
@@ -1533,31 +2345,15 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   wrapped(page1, [evaluation.recommendation.lead, ...evaluation.recommendation.actions.slice(0, 2)].join(" "), margin + 14, 492, contentWidth - 28, 8.5, "#15356f", "F1", 10, 4);
 
   sectionTitle(page1, "KPIs principales", margin, 428);
-  const kpiWidth = (contentWidth - 3 * 8) / 4;
-  kpis.slice(0, 12).forEach(([label, value, helper, status], index) => {
-    const col = index % 4;
-    const row = Math.floor(index / 4);
-    kpiCard(page1, label, value, helper, margin + col * (kpiWidth + 8), 350 - row * 64, kpiWidth, status);
+  const kpiWidth = (contentWidth - 4 * 8) / 5;
+  kpis.slice(0, 5).forEach(([label, value, helper, status], index) => {
+    kpiCard(page1, label, value, helper, margin + index * (kpiWidth + 8), 350, kpiWidth, status);
   });
 
-  const page2 = startPage("RESULTADO Y FONDO DEL CASO", input.projectName || "Proyecto CAPEX");
-  sectionTitle(page2, "Score ejecutivo", margin, 680);
-  const scoreWidth = (contentWidth - 4 * 8) / 5;
-  evaluation.scoreRows.slice(0, 5).forEach((row, index) => {
-    scoreCard(page2, row, margin + index * (scoreWidth + 8), 604, scoreWidth);
-  });
-
-  fillRect(page2, margin, 452, contentWidth, 116, "#ffffff");
-  strokeRect(page2, margin, 452, contentWidth, 116);
-  sectionTitle(page2, "Recomendacion general", margin + 14, 550);
-  wrapped(page2, [evaluation.recommendation.lead, ...evaluation.recommendation.actions.slice(0, 3)].join(" "), margin + 14, 530, contentWidth - 28, 8.7, "#15356f", "F1", 11, 6);
-
-  fillRect(page2, margin, 244, contentWidth, 180, "#ffffff");
-  strokeRect(page2, margin, 244, contentWidth, 180);
-  sectionTitle(page2, "Supuestos base", margin + 14, 406);
   const assumptionRows = [
     ["Equipo", currency(input.equipmentCost), "Instalacion", currency(input.installationCost), "Capacitacion", currency(input.trainingCost)],
     ["Otros costos", currency(input.otherCosts), "WACC", percent(input.discountRate), "Impuesto", percent(input.taxRate)],
+    ["Residual", percent(input.residualPct), "Valor residual", currency(input.salvageValue), "Deprec. anual", currency(input.annualDepreciation)],
     ["TIR minima", percent(input.requiredIrr), "Payback max.", `${number(input.maxPayback, 1)} anos`, "Meta ROI", percent(input.targetRoi)],
   ];
   if (input.impactCategory === "Ventas") {
@@ -1566,18 +2362,27 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   } else {
     assumptionRows.push(["Ahorro anual", currency(input.annualCostSavings), "Opex incr.", currency(input.annualOpexIncrease), "Riesgo evitado", currency(input.riskAvoidanceBenefit)]);
   }
-  let assumptionY = 380;
+
+  fillRect(page1, margin, 220, contentWidth, 96, "#ffffff");
+  strokeRect(page1, margin, 220, contentWidth, 96);
+  sectionTitle(page1, "Recomendacion general", margin + 14, 298);
+  wrapped(page1, [evaluation.recommendation.lead, ...evaluation.recommendation.actions.slice(0, 3)].join(" "), margin + 14, 278, contentWidth - 28, 8.3, "#15356f", "F1", 10, 5);
+
+  fillRect(page1, margin, 58, contentWidth, 136, "#ffffff");
+  strokeRect(page1, margin, 58, contentWidth, 136);
+  sectionTitle(page1, "Supuestos base", margin + 14, 176);
+  let assumptionY = 154;
   assumptionRows.forEach((row) => {
     [0, 1, 2].forEach((index) => {
       const x = margin + 14 + index * 168;
-      addText(page2, row[index * 2], x, assumptionY, 6.8, "#4f6a9a", "F1");
-      addText(page2, row[index * 2 + 1], x, assumptionY - 12, 8.2, "#081f63", "F2");
+      addText(page1, row[index * 2], x, assumptionY, 6.8, "#4f6a9a", "F1");
+      addText(page1, row[index * 2 + 1], x, assumptionY - 12, 8.2, "#081f63", "F2");
     });
-    assumptionY -= 27;
+    assumptionY -= 18;
   });
 
-  const page3 = startPage("DETALLE DE FLUJOS", input.projectName || "Proyecto CAPEX");
-  sectionTitle(page3, "Matriz de flujos y resultados", margin, 680, 150);
+  const page2 = startPage("DETALLE DE FLUJOS", input.projectName || "Proyecto CAPEX");
+  sectionTitle(page2, "Matriz de flujos y resultados", margin, 680, 150);
   const years = evaluation.flows.map((flow) => `A${flow.year}`);
   const yearZero = {
     revenue: 0,
@@ -1633,10 +2438,10 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   const labelWidth = 94;
   const valueColWidth = (contentWidth - labelWidth) / (years.length + 1);
   const tableFont = valueColWidth < 44 ? 6.1 : 7;
-  fillRect(page3, tableX, tableY, contentWidth, rowHeight, "#10253f");
-  addText(page3, "Supuestos", tableX + 5, tableY + 7, 7.2, "#ffffff", "F2");
+  fillRect(page2, tableX, tableY, contentWidth, rowHeight, "#10253f");
+  addText(page2, "Supuestos", tableX + 5, tableY + 7, 7.2, "#ffffff", "F2");
   ["A0", ...years].forEach((year, index) => {
-    addText(page3, year, tableX + labelWidth + index * valueColWidth + 4, tableY + 7, 7, "#ffffff", "F2");
+    addText(page2, year, tableX + labelWidth + index * valueColWidth + 4, tableY + 7, 7, "#ffffff", "F2");
   });
   const pdfTableValue = (value, type) => {
     if (value === null || value === undefined) return "";
@@ -1646,12 +2451,12 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   };
   flowRows.forEach((row, rowIndex) => {
     const y = tableY - (rowIndex + 1) * rowHeight;
-    fillRect(page3, tableX, y, contentWidth, rowHeight, rowIndex % 2 === 0 ? "#ffffff" : "#f8fbff");
-    strokeRect(page3, tableX, y, contentWidth, rowHeight, "#d9e1ea", 0.3);
-    addText(page3, row.label, tableX + 5, y + 7, 6.8, "#081f63", row.emphasis ? "F2" : "F1");
+    fillRect(page2, tableX, y, contentWidth, rowHeight, rowIndex % 2 === 0 ? "#ffffff" : "#f8fbff");
+    strokeRect(page2, tableX, y, contentWidth, rowHeight, "#d9e1ea", 0.3);
+    addText(page2, row.label, tableX + 5, y + 7, 6.8, "#081f63", row.emphasis ? "F2" : "F1");
     row.values.forEach((value, index) => {
       const color = value < 0 ? "#cc4f62" : row.emphasis && value > 0 ? "#1d8a56" : "#15356f";
-      addText(page3, pdfTableValue(value, row.type), tableX + labelWidth + index * valueColWidth + 3, y + 7, tableFont, color, row.emphasis ? "F2" : "F1");
+      addText(page2, pdfTableValue(value, row.type), tableX + labelWidth + index * valueColWidth + 3, y + 7, tableFont, color, row.emphasis ? "F2" : "F1");
     });
   });
 
@@ -1664,17 +2469,17 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   const signatureTop = 212;
   const signatureCardWidth = (contentWidth - 18) / 2;
   const signatureCardHeight = 70;
-  sectionTitle(page3, "Area de firmas", margin, signatureTop + 36, 110);
+  sectionTitle(page2, "Area de firmas", margin, signatureTop + 36, 110);
   signatures.forEach(([role, helper], index) => {
     const col = index % 2;
     const row = Math.floor(index / 2);
     const x = margin + col * (signatureCardWidth + 18);
     const y = signatureTop - row * 86;
-    fillRect(page3, x, y - signatureCardHeight, signatureCardWidth, signatureCardHeight, "#ffffff");
-    strokeRect(page3, x, y - signatureCardHeight, signatureCardWidth, signatureCardHeight, "#d9e1ea", 0.7);
-    addText(page3, role, x + 12, y - 18, 8.2, "#081f63", "F2");
-    addText(page3, helper, x + 12, y - 34, 7.2, "#4f6a9a", "F1");
-    strokeRect(page3, x + 12, y - 54, signatureCardWidth - 24, 0.1, "#33475e", 0.7);
+    fillRect(page2, x, y - signatureCardHeight, signatureCardWidth, signatureCardHeight, "#ffffff");
+    strokeRect(page2, x, y - signatureCardHeight, signatureCardWidth, signatureCardHeight, "#d9e1ea", 0.7);
+    addText(page2, role, x + 12, y - 18, 8.2, "#081f63", "F2");
+    addText(page2, helper, x + 12, y - 34, 7.2, "#4f6a9a", "F1");
+    strokeRect(page2, x + 12, y - 54, signatureCardWidth - 24, 0.1, "#33475e", 0.7);
   });
 
   const pageCount = pages.length;
@@ -1735,10 +2540,7 @@ function buildExcelWorkbook(input, evaluation) {
     ["VAN", currency(evaluation.npv), evaluation.npv >= 0 ? "KpiGreen" : "KpiRed"],
     ["TIR", evaluation.irrPct ? percent(evaluation.irrPct) : "No calculable", "KpiBlue"],
     ["Payback", evaluation.payback === null ? "No recupera" : `${number(evaluation.payback, 1)} años`, "KpiNeutral"],
-    ["ROI", percent(evaluation.roi), evaluation.roi >= input.targetRoi ? "KpiGreen" : "KpiRed"],
-    ["EVA anual", currency(evaluation.eva), evaluation.eva >= 0 ? "KpiGreen" : "KpiRed"],
-    ["Score integral", `${number(evaluation.score, 0)} / 100`, evaluation.score >= input.targetScore ? "KpiGreen" : "KpiRed"],
-    impactKpiRow,
+    ["Score", `${number(evaluation.score, 0)} / 100`, evaluation.score >= input.targetScore ? "KpiGreen" : "KpiRed"],
   ];
 
   const summaryRows = [
@@ -1754,9 +2556,12 @@ function buildExcelWorkbook(input, evaluation) {
     blankRow,
     sectionRow("Datos generales del proyecto"),
     twoColumnRow("Área solicitante", input.businessArea),
-    twoColumnRow("Responsable", input.sponsor),
-    twoColumnRow("Impacto CAPEX", input.impactCategory || "Ventas"),
-    twoColumnRow("Categoría", projectType),
+    twoColumnRow("Sponsor / Driver", input.sponsor),
+    twoColumnRow("Tipo CAPEX", projectType),
+    twoColumnRow("Proyecto Malta Asociado", input.maltaProject),
+    twoColumnRow("KPI Grupo que Impacta", input.groupKpi),
+    twoColumnRow("Objetivo Estrategico", formatStrategicObjectives(input.strategicObjectives)),
+    twoColumnRow("Impacto economico", input.impactCategory || "Ventas"),
     twoColumnRow("Horizonte", `${number(input.projectLife, 0)} años`),
     twoColumnRow("Objetivo", input.projectGoal),
     blankRow,
@@ -1875,9 +2680,12 @@ function buildExcelWorkbook(input, evaluation) {
     blankRow,
     sectionRow("Datos generales del proyecto"),
     twoColumnRow("Area solicitante", input.businessArea),
-    twoColumnRow("Responsable", input.sponsor),
-    twoColumnRow("Impacto CAPEX", input.impactCategory || "Ventas"),
-    twoColumnRow("Categoria", projectType),
+    twoColumnRow("Sponsor / Driver", input.sponsor),
+    twoColumnRow("Tipo CAPEX", projectType),
+    twoColumnRow("Proyecto Malta Asociado", input.maltaProject),
+    twoColumnRow("KPI Grupo que Impacta", input.groupKpi),
+    twoColumnRow("Objetivo Estrategico", formatStrategicObjectives(input.strategicObjectives)),
+    twoColumnRow("Impacto economico", input.impactCategory || "Ventas"),
     twoColumnRow("Horizonte", `${number(input.projectLife, 0)} anos`),
     twoColumnRow("Objetivo", input.projectGoal),
     blankRow,
@@ -1891,6 +2699,7 @@ function buildExcelWorkbook(input, evaluation) {
   const assumptionRows = [
     ["Equipo", currency(input.equipmentCost), "Instalacion", currency(input.installationCost), "Capacitacion", currency(input.trainingCost)],
     ["Otros costos", currency(input.otherCosts), "WACC", percent(input.discountRate), "Impuesto", percent(input.taxRate)],
+    ["Residual", percent(input.residualPct), "Valor residual", currency(input.salvageValue), "Deprec. anual", currency(input.annualDepreciation)],
     ["TIR minima", percent(input.requiredIrr), "Payback max.", `${number(input.maxPayback, 1)} anos`, "Meta ROI", percent(input.targetRoi)],
   ];
   if (input.impactCategory === "Ventas") {
@@ -2133,7 +2942,9 @@ function evaluateProject(options = {}) {
   const shouldSave = options.persist !== false;
   const input = getInputs();
   statusNode.textContent = "Calculando indicadores y recomendacion...";
-  evaluateButton.disabled = true;
+  if (evaluateButton) {
+    evaluateButton.disabled = true;
+  }
 
   window.setTimeout(() => {
     const evaluation = buildEvaluation(input);
@@ -2146,6 +2957,7 @@ function evaluateProject(options = {}) {
     renderHeadline(input);
     renderCards(evaluation);
     renderProgressRows("scoreTable", evaluation.scoreRows);
+    renderValidationMessages(input, evaluation);
     renderRecommendation(evaluation.recommendation);
     renderCashFlowTable(evaluation.flows, evaluation);
     drawCashFlowChart(evaluation.flows);
@@ -2153,23 +2965,31 @@ function evaluateProject(options = {}) {
     statusNode.textContent = shouldSave
       ? `Evaluacion completada y ultimo CAPEX guardado para "${input.projectName}".`
       : `Evaluacion completada para "${input.projectName}".`;
-    evaluateButton.disabled = false;
+    if (evaluateButton) {
+      evaluateButton.disabled = false;
+    }
   }, 40);
 }
 
-evaluateButton.addEventListener("click", evaluateProject);
+if (evaluateButton) {
+  evaluateButton.addEventListener("click", evaluateProject);
+}
 newCapexButton.addEventListener("click", startNewCapex);
 downloadPdfButton.addEventListener("click", exportExecutivePdf);
 downloadExcelButton.addEventListener("click", exportExcelWorkbook);
 elements.businessArea.addEventListener("change", syncSponsorByArea);
-["equipmentCost", "installationCost", "trainingCost", "otherCosts"].forEach((id) => {
+elements.projectType.addEventListener("change", () => {
+  applyCapexTemplate(elements.projectType.value);
+  evaluateProject({ persist: false });
+});
+["equipmentCost", "installationCost", "trainingCost", "otherCosts", "residualPct"].forEach((id) => {
   elements[id].addEventListener("input", syncRequiredInvestmentTotal);
 });
 impactCategoryOptions.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-value]");
   if (!button) return;
   syncImpactCategory(button.dataset.value);
-  statusNode.textContent = `Categoria "${button.dataset.value}" seleccionada.`;
+  statusNode.textContent = `Impacto "${button.dataset.value}" seleccionado.`;
 });
 if (strategyOptions) {
   strategyOptions.addEventListener("click", (event) => {
@@ -2178,13 +2998,42 @@ if (strategyOptions) {
     syncStrategicFocus(button.dataset.value);
   });
 }
+elements.strategicObjectives.addEventListener("change", () => {
+  syncMaltaProjectOptions();
+});
+wizardSteps.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    if (index > currentWizardStep && !validateCurrentStep()) return;
+    setWizardStep(index > currentWizardStep + 1 ? currentWizardStep + 1 : index);
+  });
+});
+if (prevStepButton) {
+  prevStepButton.addEventListener("click", () => setWizardStep(currentWizardStep - 1));
+}
+if (nextStepButton) {
+  nextStepButton.addEventListener("click", () => {
+    if (!validateCurrentStep()) return;
+    if (currentWizardStep < wizardSteps.length - 1) {
+      setWizardStep(currentWizardStep + 1);
+      return;
+    }
+    evaluateProject();
+  });
+}
+attachHelpDots();
+hideTemplateOnlyGovernanceRows();
+const resultsTitle = document.querySelector(".results-panel h2");
+if (resultsTitle) {
+  resultsTitle.textContent = "Evaluaci\u00f3n y Recomendaci\u00f3n del Proyecto";
+}
 const restoredLastCapex = restoreLastCapex();
 if (!restoredLastCapex) {
   syncSponsorByArea();
-  syncRequiredInvestmentTotal();
-  syncImpactCategory(elements.impactCategory.value || "Ventas");
+  applyCorporateAssumptions();
+  applyCapexTemplate(elements.projectType.value || "Crecimiento", { updateStatus: false });
   syncStrategicFocus(elements.strategicFocus.value || "Ventas");
 }
+setWizardStep(0);
 evaluateProject({ persist: false });
 if (restoredLastCapex) {
   window.setTimeout(() => {
