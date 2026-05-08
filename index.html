@@ -113,35 +113,15 @@
               <input id="projectName" type="text" value="Renovacion de linea de produccion" required>
             </label>
             <label>
-              <span>Area solicitante</span>
+              <span>Divisi&oacute;n solicitante</span>
               <select id="businessArea" required>
-                <option value="Repuestos">Repuestos</option>
-                <option value="Autos Nuevos Toyota">Autos Nuevos Toyota</option>
-                <option value="Cpd Repuestos">Cpd Repuestos</option>
-                <option value="Talleres - Autos">Talleres - Autos</option>
-                <option value="Informatica">Informatica</option>
-                <option value="Rent A Car">Rent A Car</option>
-                <option value="Camiones Hino">Camiones Hino</option>
-                <option value="Talleres - Hino">Talleres - Hino</option>
-                <option value="Talleres">Talleres</option>
-                <option value="Fidem">Fidem</option>
-                <option value="Capital Humano">Capital Humano</option>
-                <option value="Autos Usados">Autos Usados</option>
-                <option value="Autos Nuevos Suzuki">Autos Nuevos Suzuki</option>
-                <option value="Equipos Industriales">Equipos Industriales</option>
-                <option value="Call Center">Call Center</option>
-                <option value="Capesa">Capesa</option>
-                <option value="Talleres - Motos">Talleres - Motos</option>
-                <option value="Mercadeo">Mercadeo</option>
-                <option value="Autos Nuevos Kia">Autos Nuevos Kia</option>
-                <option value="Autos Nuevos Geely">Autos Nuevos Geely</option>
-                <option value="Camiones Faw">Camiones Faw</option>
-                <option value="Motos - Genesis">Motos - Genesis</option>
-                <option value="Motos - Yamaha">Motos - Yamaha</option>
-                <option value="Motos - Hero">Motos - Hero</option>
-                <option value="Motos - Yadea">Motos - Yadea</option>
-                <option value="Finanzas">Finanzas</option>
-                <option value="Alpesa">Alpesa</option>
+                <option value="Divisi&oacute;n Repuestos">Divisi&oacute;n Repuestos</option>
+              </select>
+            </label>
+            <label>
+              <span>Unidad de negocio</span>
+              <select id="businessUnit" required>
+                <option value="Repuestos Genuinos">Repuestos Genuinos</option>
               </select>
             </label>
             <label>
@@ -149,31 +129,38 @@
               <input id="sponsor" type="text" value="Miguel Sacasa" required>
             </label>
             <label>
-              <span>Objetivo Estrat&eacute;gico</span>
+              <span>Enfoque</span>
               <select id="strategicObjectives" required>
                 <option value="">Seleccione una opcion</option>
                 <option value="Consolidar Participaci&oacute;n En Mercado Automotriz">Consolidar Participaci&oacute;n En Mercado Automotriz</option>
                 <option value="Crecer Nuestro Negocio Posventa">Crecer Nuestro Negocio Posventa</option>
                 <option value="Anticipar Y Gestionar Riesgos">Anticipar Y Gestionar Riesgos</option>
                 <option value="Desarrollar Excelente Personas Y Procesos">Desarrollar Excelente Personas Y Procesos</option>
+                <option value="Otros">Otros</option>
               </select>
             </label>
             <label>
               <span>Proyecto Malta Asociado</span>
               <select id="maltaProject" required>
-                <option value="">Seleccione un objetivo estrat&eacute;gico primero</option>
+                <option value="">Seleccione un enfoque primero</option>
               </select>
+            </label>
+            <label id="otherMaltaJustificationField" class="full-span" hidden>
+              <span>Justifique la Inversi&oacute;n (Especifique)</span>
+              <textarea id="otherMaltaJustification" rows="3"></textarea>
             </label>
             <label>
               <span>KPI Grupo que Impacta</span>
               <select id="groupKpi" required>
                 <option value="">Seleccione una opcion</option>
-                <option value="EBITDA">EBITDA</option>
-                <option value="Ventas / margen bruto">Ventas / margen bruto</option>
-                <option value="Productividad operativa">Productividad operativa</option>
-                <option value="NPS / satisfaccion de clientes">NPS / satisfaccion de clientes</option>
-                <option value="Cumplimiento regulatorio">Cumplimiento regulatorio</option>
-                <option value="Continuidad operacional">Continuidad operacional</option>
+                <option value="Ahorro en Gastos/Costos">Ahorro en Gastos/Costos</option>
+                <option value="Incremento en Ventas">Incremento en Ventas</option>
+                <option value="Satisfacci&oacute;n del Cliente">Satisfacci&oacute;n del Cliente</option>
+                <option value="Cumplimiento Regulatorio">Cumplimiento Regulatorio</option>
+                <option value="Eficiencia Operativa">Eficiencia Operativa</option>
+                <option value="Clima Organizacional">Clima Organizacional</option>
+                <option value="Mitigaci&oacute;n de Riesgos">Mitigaci&oacute;n de Riesgos</option>
+                <option value="No Aplica">No Aplica</option>
               </select>
             </label>
             <label hidden>
@@ -270,6 +257,10 @@
               <input id="installationCost" type="number" min="0" step="1000" value="55000">
             </label>
             <label>
+              <span>Propiedades e Infraestructura</span>
+              <input id="propertyInfrastructureCost" type="number" min="0" step="1000" value="0">
+            </label>
+            <label>
               <span>Capacitacion</span>
               <input id="trainingCost" type="number" min="0" step="1000" value="12000">
             </label>
@@ -293,7 +284,7 @@
           </div>
           <div class="form-grid">
             <label class="full-span">
-              <span>Tipo de impacto esperado</span>
+              <span>Selecciona el Tipo de Impacto que generar&aacute; este proyecto (Solo puedes seleccionar una opci&oacute;n)</span>
               <input id="impactCategory" type="hidden" value="Ventas">
               <div class="strategy-options impact-options" id="impactCategoryOptions">
                 <button class="impact-button active" type="button" data-value="Ventas">Ventas</button>
@@ -333,11 +324,11 @@
               <span>Ahorro anual en costos</span>
               <input id="annualCostSavings" type="number" min="0" step="1000" value="145000">
             </label>
-            <label class="impact-field" data-impact="Ahorro,No genera impacto economico">
+            <label class="impact-field" data-impact="No genera impacto economico">
               <span>Costos operativos incrementales</span>
               <input id="annualOpexIncrease" type="number" min="0" step="1000" value="62000">
             </label>
-            <label class="impact-field" data-impact="Ahorro">
+            <label class="impact-field" data-impact="legacy">
               <span>Beneficio por riesgos evitados</span>
               <input id="riskAvoidanceBenefit" type="number" min="0" step="1000" value="30000">
             </label>
@@ -376,20 +367,12 @@
           </div>
           <div class="form-grid">
             <label>
-              <span>Alineacion estrategica (1-5)</span>
+              <span>Alineacion estrategica automatica (1-5)</span>
               <input id="strategicAlignment" type="number" min="1" max="5" step="1" value="5">
             </label>
             <label>
-              <span>Urgencia operativa (1-5)</span>
+              <span>Urgencia operativa / Peso Malta (1-5)</span>
               <input id="operationalUrgency" type="number" min="1" max="5" step="1" value="4">
-            </label>
-            <label>
-              <span>Reduccion de riesgo (1-5)</span>
-              <input id="riskReduction" type="number" min="1" max="5" step="1" value="4">
-            </label>
-            <label>
-              <span>Capacidad de ejecucion (1-5)</span>
-              <input id="executionReadiness" type="number" min="1" max="5" step="1" value="4">
             </label>
           </div>
         </section>
@@ -423,7 +406,7 @@
             <h3 id="projectHeadline">Renovacion de linea de produccion</h3>
           </div>
           <div>
-            <p class="summary-label">Area</p>
+            <p class="summary-label">Divisi&oacute;n / unidad</p>
             <strong id="areaHeadline">Operaciones</strong>
           </div>
           <div>
@@ -478,6 +461,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=20260429-13"></script>
+  <script src="app.js?v=20260429-28"></script>
 </body>
 </html>
