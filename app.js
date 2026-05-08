@@ -551,7 +551,7 @@ function formatMaltaProject(input) {
 }
 
 function formatDivisionUnit(input) {
-  const division = input?.businessArea || "Sin division";
+  const division = input?.businessArea || "Sin area";
   const unit = input?.businessUnit || "";
   return unit ? `${division} / ${unit}` : division;
 }
@@ -1127,7 +1127,7 @@ function getValidationMessages(input, evaluation) {
       add("warning", "Sponsor / Driver pendiente", "Indica quien impulsa y responde por el caso.");
     }
     if (!input.businessUnit) {
-      add("warning", "Unidad pendiente", "Selecciona la unidad de negocio asociada a la division.");
+      add("warning", "Unidad pendiente", "Selecciona la unidad de negocio asociada al area.");
     }
     if (!input.maltaProject) {
       add("warning", "Proyecto Malta pendiente", "Selecciona el Proyecto Malta Asociado.");
@@ -1308,7 +1308,7 @@ function validateCurrentStep() {
   if (selectedStep === "type") {
     if (!input.projectType) add("projectType", "Selecciona el tipo de CAPEX.");
     if (!String(input.projectName || "").trim()) add("projectName", "Ingresa el nombre del proyecto.");
-    if (!input.businessArea) add("businessArea", "Selecciona la division solicitante.");
+    if (!input.businessArea) add("businessArea", "Selecciona el area solicitante.");
     if (!input.businessUnit) add("businessUnit", "Selecciona la unidad de negocio.");
     if (!String(input.sponsor || "").trim()) add("sponsor", "Indica el Sponsor / Driver.");
     if (!input.maltaProject) add("maltaProject", "Selecciona el Proyecto Malta Asociado.");
@@ -2523,7 +2523,7 @@ async function buildExecutivePdf(input, evaluation) {
   fillRect(42, 532, 528, 92, "#ffffff");
   strokeRect(42, 532, 528, 92, "#d9e1ea", 0.7);
   sectionTitle("Datos generales del proyecto", 58, 606);
-  dataField("Division / unidad", formatDivisionUnit(input), 58, 584, 140);
+  dataField("Area / unidad", formatDivisionUnit(input), 58, 584, 140);
   dataField("Sponsor / Driver", input.sponsor, 212, 584, 86);
   dataField("Tipo CAPEX", projectTypeLabels[input.projectType] || input.projectType, 310, 584, 108);
   dataField("Horizonte", `${number(input.projectLife, 0)} años`, 436, 584, 90);
@@ -2697,7 +2697,7 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   fillRect(page1, margin, 528, contentWidth, 100, "#ffffff");
   strokeRect(page1, margin, 528, contentWidth, 100);
   sectionTitle(page1, "Datos generales", margin + 14, 612);
-  field(page1, "Division / unidad", formatDivisionUnit(input), margin + 14, 590, 220, 1);
+  field(page1, "Area / unidad", formatDivisionUnit(input), margin + 14, 590, 220, 1);
   field(page1, "Sponsor / Driver", input.sponsor, margin + 250, 590, 120);
   field(page1, "Tipo CAPEX", projectTypeLabels[input.projectType] || input.projectType, margin + 386, 590, 82);
   field(page1, "Horizonte", `${number(input.projectLife, 0)} anos`, margin + 474, 590, 50);
@@ -2924,7 +2924,7 @@ function buildExcelWorkbook(input, evaluation) {
     ], { height: 28 }),
     blankRow,
     sectionRow("Datos generales del proyecto"),
-    twoColumnRow("Division solicitante", input.businessArea),
+    twoColumnRow("Area solicitante", input.businessArea),
     twoColumnRow("Unidad de negocio", input.businessUnit),
     twoColumnRow("Sponsor / Driver", input.sponsor),
     twoColumnRow("Tipo CAPEX", projectType),
@@ -3049,7 +3049,7 @@ function buildExcelWorkbook(input, evaluation) {
     ], { height: 28 }),
     blankRow,
     sectionRow("Datos generales del proyecto"),
-    twoColumnRow("Division solicitante", input.businessArea),
+    twoColumnRow("Area solicitante", input.businessArea),
     twoColumnRow("Unidad de negocio", input.businessUnit),
     twoColumnRow("Sponsor / Driver", input.sponsor),
     twoColumnRow("Tipo CAPEX", projectType),
