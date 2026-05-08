@@ -511,6 +511,7 @@ let latestEvaluation = null;
 let currentWizardStep = 0;
 const LAST_CAPEX_STORAGE_KEY = "capex:lastRegistered";
 const PROJECT_CODE_SEQUENCE_KEY = "capex:projectCodeSequence";
+const PROJECT_CODE_MAX_SERIAL = 999;
 
 function getInputValue(id) {
   const element = elements[id];
@@ -770,6 +771,9 @@ function restoreLastCapex() {
       setFieldValue(id, value);
     });
     rememberProjectCodeSerial(parsed.input.projectCode);
+    if (!getProjectCodeSerial(elements.projectCode?.value)) {
+      elements.projectCode.value = generateProjectCode();
+    }
     setFieldValue("projectType", restoredType);
     if (!parsed.input.strategicObjectives) {
       setFieldValue("strategicObjectives", capexTemplates[restoredType]?.strategicObjectives || []);
@@ -814,7 +818,8 @@ function generateProjectCode() {
 
 function getProjectCodeSerial(code) {
   const match = String(code || "").match(/-\s*(\d+)\s*$/);
-  return match ? Number(match[1]) : 0;
+  const serial = match ? Number(match[1]) : 0;
+  return serial > 0 && serial <= PROJECT_CODE_MAX_SERIAL ? serial : 0;
 }
 
 function formatProjectCodeSerial(serial) {
@@ -822,7 +827,8 @@ function formatProjectCodeSerial(serial) {
 }
 
 function getNextProjectCodeSerial() {
-  const current = Number(localStorage.getItem(PROJECT_CODE_SEQUENCE_KEY) || 0);
+  const stored = Number(localStorage.getItem(PROJECT_CODE_SEQUENCE_KEY) || 0);
+  const current = stored > 0 && stored <= PROJECT_CODE_MAX_SERIAL ? stored : 0;
   const next = current + 1;
   localStorage.setItem(PROJECT_CODE_SEQUENCE_KEY, String(next));
   return next;
@@ -832,7 +838,8 @@ function rememberProjectCodeSerial(code) {
   const serial = getProjectCodeSerial(code);
   if (!serial) return;
 
-  const current = Number(localStorage.getItem(PROJECT_CODE_SEQUENCE_KEY) || 0);
+  const stored = Number(localStorage.getItem(PROJECT_CODE_SEQUENCE_KEY) || 0);
+  const current = stored > 0 && stored <= PROJECT_CODE_MAX_SERIAL ? stored : 0;
   if (serial > current) {
     localStorage.setItem(PROJECT_CODE_SEQUENCE_KEY, String(serial));
   }
