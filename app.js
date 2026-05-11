@@ -37,6 +37,7 @@ const fieldIds = [
   "variableCostPct",
   "salesExpensePct",
   "fixedCommercialCost",
+  "fixedCommercialCostGrowthPct",
   "annualDepreciation",
   "discountRate",
   "taxRate",
@@ -202,6 +203,7 @@ const capexTemplates = {
     variableCostPct: 0,
     salesExpensePct: 0,
     fixedCommercialCost: 0,
+    fixedCommercialCostGrowthPct: 0,
     targetRoi: 20,
     targetScore: 85,
     strategicAlignment: 3,
@@ -236,6 +238,7 @@ const capexTemplates = {
     variableCostPct: 47,
     salesExpensePct: 20.7,
     fixedCommercialCost: 78000,
+    fixedCommercialCostGrowthPct: 0,
     targetRoi: 35,
     targetScore: 85,
     strategicAlignment: 5,
@@ -270,6 +273,7 @@ const capexTemplates = {
     variableCostPct: 0,
     salesExpensePct: 0,
     fixedCommercialCost: 0,
+    fixedCommercialCostGrowthPct: 0,
     targetRoi: 30,
     targetScore: 88,
     strategicAlignment: 5,
@@ -304,6 +308,7 @@ const capexTemplates = {
     variableCostPct: 0,
     salesExpensePct: 0,
     fixedCommercialCost: 0,
+    fixedCommercialCostGrowthPct: 0,
     targetRoi: 15,
     targetScore: 90,
     strategicAlignment: 4,
@@ -331,6 +336,7 @@ const helpMessages = {
   propertyInfrastructureCost: "Monto asociado a terrenos, adecuaciones, obra civil o infraestructura requerida para ejecutar el CAPEX.",
   requiredInvestmentTotal: "Suma automaticamente equipos, instalacion, propiedades e infraestructura, capacitacion y otros costos.",
   residualPct: "Porcentaje de la inversion que se espera recuperar como valor residual al final de la vida util.",
+  fixedCommercialCostGrowthPct: "Porcentaje anual de crecimiento del gasto fijo incremental despues del ano 1.",
   annualDepreciation: "Depreciacion anual calculada como inversion menos valor residual, dividida entre la vida del proyecto.",
   discountRate: "WACC fijado por Finanzas. Se usa para descontar los flujos y calcular VAN.",
   taxRate: "Tasa fiscal corporativa fijada por Finanzas para estandarizar la evaluacion.",
@@ -490,6 +496,7 @@ const categoryFocusMap = {
 const elements = Object.fromEntries(fieldIds.map((id) => [id, document.getElementById(id)]));
 const evaluateButton = document.getElementById("evaluateProject");
 const newCapexButton = document.getElementById("newCapex");
+const sendSharePointButton = document.getElementById("sendSharePoint");
 const downloadPdfButton = document.getElementById("downloadPdf");
 const downloadExcelButton = document.getElementById("downloadExcel");
 const impactCategoryOptions = document.getElementById("impactCategoryOptions");
@@ -512,6 +519,8 @@ let currentWizardStep = 0;
 const LAST_CAPEX_STORAGE_KEY = "capex:lastRegistered";
 const PROJECT_CODE_SEQUENCE_KEY = "capex:projectCodeSequence";
 const PROJECT_CODE_MAX_SERIAL = 999;
+const POWER_AUTOMATE_FLOW_URL = "https://defaultc663fba5d30a453ab2819f692716d5.16.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/78854a17efc646e792183394406d43b4/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=YgyruCEaCF92XG2XGYzBAOgZnuvYghTaFQ2LloiGnFg";
+const POWER_AUTOMATE_FLOW_URL_STORAGE_KEY = "capex:powerAutomateFlowUrl";
 
 function getInputValue(id) {
   const element = elements[id];
@@ -721,6 +730,7 @@ function getInputs() {
     variableCostPct: Number(getInputValue("variableCostPct")),
     salesExpensePct: Number(getInputValue("salesExpensePct")),
     fixedCommercialCost: Number(getInputValue("fixedCommercialCost")),
+    fixedCommercialCostGrowthPct: Number(getInputValue("fixedCommercialCostGrowthPct")),
     annualDepreciation: Number(getInputValue("annualDepreciation")),
     discountRate: Number(getInputValue("discountRate")),
     taxRate: Number(getInputValue("taxRate")),
@@ -1344,6 +1354,9 @@ function validateCurrentStep() {
       if (input.variableCostPct + input.salesExpensePct >= 100) {
         add("salesExpensePct", "Costo variable mas gasto de ventas debe ser menor a 100%.");
       }
+      if (input.fixedCommercialCostGrowthPct < -100 || input.fixedCommercialCostGrowthPct > 100) {
+        add("fixedCommercialCostGrowthPct", "Usa un porcentaje de gasto fijo entre -100% y 100%.");
+      }
     }
     if (input.impactCategory === "Ahorro" && input.annualCostSavings <= 0) {
       add("annualCostSavings", "Indica el ahorro anual en costos.");
@@ -1420,6 +1433,7 @@ function startNewCapex() {
     variableCostPct: 47,
     salesExpensePct: 20.7,
     fixedCommercialCost: 78000,
+    fixedCommercialCostGrowthPct: 0,
     annualDepreciation: 0,
     discountRate: 12,
     taxRate: 32,
@@ -1520,6 +1534,85 @@ function getEvaluationPackage() {
   latestEvaluation = evaluation;
   saveLastCapex(input, evaluation);
   return { input, evaluation };
+}
+
+function getPowerAutomateFlowUrl() {
+  return localStorage.getItem(POWER_AUTOMATE_FLOW_URL_STORAGE_KEY) || POWER_AUTOMATE_FLOW_URL;
+}
+
+function buildSharePointPayload(input, evaluation) {
+  return {
+    submittedAt: new Date().toISOString(),
+    source: "Evaluador CAPEX",
+    projectCode: input.projectCode,
+    projectName: input.projectName,
+    businessArea: input.businessArea,
+    businessUnit: input.businessUnit,
+    sponsorDriver: input.sponsor,
+    projectType: projectTypeLabels[normalizeCapexType(input.projectType)] || input.projectType,
+    impactCategory: input.impactCategory,
+    strategicFocus: input.strategicFocus,
+    enfoque: formatStrategicObjectives(input.strategicObjectives),
+    maltaProject: formatMaltaProject(input),
+    groupKpi: input.groupKpi,
+    projectGoal: input.projectGoal,
+    otherMaltaJustification: input.otherMaltaJustification,
+    recommendation: evaluation.recommendation.label,
+    recommendationTone: evaluation.recommendation.tone,
+    recommendationText: [evaluation.recommendation.lead, ...evaluation.recommendation.actions].join(" "),
+    totalInvestment: Math.round(evaluation.totalInvestment),
+    npv: Math.round(evaluation.npv),
+    irrPct: Number((evaluation.irrPct || 0).toFixed(2)),
+    payback: evaluation.payback === null ? null : Number(evaluation.payback.toFixed(2)),
+    score: Math.round(evaluation.score),
+    roiPct: Number((evaluation.roi || 0).toFixed(2)),
+    evaAnnual: Math.round(evaluation.eva || 0),
+    ebitdaAverage: Math.round(evaluation.ebitdaAverage || 0),
+    averageNetFlow: Math.round(evaluation.annualAverageFlow || 0),
+    breakEvenMonthlyRevenue: Math.round(evaluation.breakEvenMonthlyRevenue || 0),
+    breakEvenMonthlyUnits: Math.round(evaluation.breakEvenMonthlyUnits || 0),
+    netMarginPct: Number((evaluation.netMarginPct || 0).toFixed(2)),
+    assumptions: {
+      projectLife: input.projectLife,
+      equipmentCost: input.equipmentCost,
+      installationCost: input.installationCost,
+      propertyInfrastructureCost: input.propertyInfrastructureCost,
+      trainingCost: input.trainingCost,
+      otherCosts: input.otherCosts,
+      residualPct: input.residualPct,
+      annualDepreciation: input.annualDepreciation,
+      discountRate: input.discountRate,
+      taxRate: input.taxRate,
+      requiredIrr: input.requiredIrr,
+      maxPayback: input.maxPayback,
+      salesUnitsYear1: input.salesUnitsYear1,
+      ticketPrice: input.ticketPrice,
+      unitGrowthRate: input.unitGrowthRate,
+      variableCostPct: input.variableCostPct,
+      salesExpensePct: input.salesExpensePct,
+      fixedCommercialCost: input.fixedCommercialCost,
+      fixedCommercialCostGrowthPct: input.fixedCommercialCostGrowthPct,
+      annualCostSavings: input.annualCostSavings,
+      annualGrowthRate: input.annualGrowthRate,
+    },
+    flows: evaluation.flows.map((flow) => ({
+      year: flow.year,
+      revenue: Math.round(flow.revenue),
+      variableCost: Math.round(flow.variableCost),
+      salesExpense: Math.round(flow.salesExpense),
+      fixedCost: Math.round(flow.fixedCost),
+      savings: Math.round(flow.savings),
+      opex: Math.round(flow.opex),
+      depreciation: Math.round(flow.depreciation),
+      ebit: Math.round(flow.ebit),
+      taxes: Math.round(flow.taxes),
+      netIncome: Math.round(flow.netIncome),
+      netFlow: Math.round(flow.netFlow),
+      discountedFlow: Math.round(flow.discountedFlow),
+      cumulativeFlow: Math.round(flow.cumulativeFlow),
+      cumulativeDiscountedFlow: Math.round(flow.cumulativeDiscountedFlow),
+    })),
+  };
 }
 
 function average(values) {
@@ -1642,7 +1735,7 @@ function buildCashFlows(input) {
       revenue = units * input.ticketPrice;
       variableCost = revenue * (input.variableCostPct / 100);
       salesExpense = revenue * (input.salesExpensePct / 100);
-      fixedCost = input.fixedCommercialCost;
+      fixedCost = input.fixedCommercialCost * (1 + (input.fixedCommercialCostGrowthPct || 0) / 100) ** (year - 1);
       opex = variableCost + salesExpense + fixedCost;
     } else if (input.impactCategory === "Ahorro") {
       const growthFactor = (1 + input.annualGrowthRate / 100) ** (year - 1);
@@ -2039,47 +2132,6 @@ function renderCards(evaluation) {
   const breakEvenRevenueStatus = evaluation.breakEvenMonthlyRevenue
     ? statusAbove(expectedMonthlyRevenue, evaluation.breakEvenMonthlyRevenue)
     : "neutral";
-  const marginStatus = evaluation.netMarginPct >= 10 ? "success" : evaluation.netMarginPct >= 5 ? "warning" : "danger";
-
-  const categoryCards = {
-    Ventas: [
-      {
-        label: "P.E. U$ / mes",
-        value: currency(evaluation.breakEvenMonthlyRevenue || 0),
-        subtext: `Ventas A1/mes ${currency(expectedMonthlyRevenue)}`,
-        status: breakEvenRevenueStatus,
-      },
-      {
-        label: "P.E. unds / mes",
-        value: `${number(evaluation.breakEvenMonthlyUnits || 0, 0)} unds.`,
-        subtext: `Meta A1 ${number(expectedMonthlyUnits, 0)} unds.`,
-        status: breakEvenUnitsStatus,
-      },
-      {
-        label: "Margen neto",
-        value: percent(evaluation.netMarginPct || 0),
-        subtext: "Utilidad neta / ventas",
-        status: marginStatus,
-      },
-    ],
-    Ahorro: [
-      {
-        label: "Ahorro promedio",
-        value: currency(evaluation.annualAverageSavings || 0),
-        subtext: `Flujo neto prom. ${currency(evaluation.annualAverageFlow)}`,
-        status: evaluation.annualAverageSavings > 0 ? "success" : "danger",
-      },
-    ],
-    "No genera impacto economico": [
-      {
-        label: "Score cualitativo",
-        value: `${number(evaluation.score, 0)} / 100`,
-        subtext: "Sin ingresos ni ahorros directos",
-        status: statusAbove(evaluation.score, Number(elements.targetScore.value), 0.9),
-      },
-    ],
-  }[evaluation.impactCategory] || [];
-
   const heroCards = [
     {
       label: "Inversion total",
@@ -2113,39 +2165,24 @@ function renderCards(evaluation) {
     },
   ];
 
-  const detailCards = [
-    {
-      label: "ROI",
-      value: percent(evaluation.roi),
-      subtext: `Meta ${percent(Number(elements.targetRoi.value))}`,
-      status: statusAbove(evaluation.roi, Number(elements.targetRoi.value), 0.85),
-    },
-    {
-      label: "EVA anual",
-      value: currency(evaluation.eva),
-      subtext: "Luego de costo capital",
-      status: evaluation.eva >= 0 ? "success" : evaluation.eva >= -evaluation.totalInvestment * 0.05 ? "warning" : "danger",
-    },
-    {
-      label: "EBITDA prom.",
-      value: currency(evaluation.ebitdaAverage || 0),
-      subtext: "Potencial operativo",
-      status: evaluation.ebitdaAverage >= 0 ? "success" : "danger",
-    },
-    {
-      label: "Beneficio prom.",
-      value: currency(evaluation.annualAverageFlow || 0),
-      subtext: "Flujo neto anual",
-      status: evaluation.annualAverageFlow >= 0 ? "success" : "danger",
-    },
-    {
-      label: "Tipo de impacto",
-      value: evaluation.impactCategory || "Ventas",
-      subtext: projectTypeLabels[elements.projectType.value] || elements.projectType.value,
-      status: "neutral",
-    },
-    ...categoryCards,
-  ];
+  const detailCards = [];
+
+  if (evaluation.impactCategory === "Ventas") {
+    detailCards.push(
+      {
+        label: "P.E. U$ / mes",
+        value: currency(evaluation.breakEvenMonthlyRevenue || 0),
+        subtext: `Ventas A1/mes ${currency(expectedMonthlyRevenue)}`,
+        status: breakEvenRevenueStatus,
+      },
+      {
+        label: "P.E. unds / mes",
+        value: `${number(evaluation.breakEvenMonthlyUnits || 0, 0)} unds.`,
+        subtext: `Meta A1 ${number(expectedMonthlyUnits, 0)} unds.`,
+        status: breakEvenUnitsStatus,
+      }
+    );
+  }
 
   const renderMetricCard = (card, className) => {
     const helpKey = Object.keys(metricHelp).find((key) => card.label.includes(key));
@@ -2164,6 +2201,7 @@ function renderCards(evaluation) {
 
   const detailContainer = document.getElementById("detailMetricCards");
   if (detailContainer) {
+    detailContainer.hidden = detailCards.length === 0;
     detailContainer.innerHTML = detailCards.map((card) => renderMetricCard(card, "detail-metric")).join("");
   }
 }
@@ -2245,9 +2283,11 @@ function compactCurrency(value) {
 function renderCashFlowTable(flows, evaluation) {
   const head = document.getElementById("cashflowMatrixHead");
   const body = document.getElementById("cashflowBody");
-  const years = flows.map((flow) => `A${flow.year}`);
+  if (!head || !body) return;
+
+  const years = flows.map((flow) => `A\u00f1o ${flow.year}`);
   const yearZero = {
-    revenue: 0,
+    revenue: evaluation.impactCategory === "Ventas" ? evaluation.totalInvestment : 0,
     savings: 0,
     variableCost: 0,
     salesExpense: 0,
@@ -2268,24 +2308,30 @@ function renderCashFlowTable(flows, evaluation) {
 
   const salesCostRows = evaluation.impactCategory === "Ventas"
     ? [
-      { label: "Costos var.", values: [yearZero.variableCost, ...flows.map((flow) => flow.variableCost)] },
-      { label: "Gastos venta", values: [yearZero.salesExpense, ...flows.map((flow) => flow.salesExpense)] },
+      { label: "Costo de venta", values: [yearZero.variableCost, ...flows.map((flow) => flow.variableCost)] },
+      { label: "Gasto variable", values: [yearZero.salesExpense, ...flows.map((flow) => flow.salesExpense)] },
       { label: "Gasto fijo", values: [yearZero.fixedCost, ...flows.map((flow) => flow.fixedCost)] },
+    ]
+    : [];
+  const nonSalesOperatingRows = evaluation.impactCategory !== "Ventas"
+    ? [
+      { label: "Ahorros", values: [yearZero.savings, ...flows.map((flow) => flow.savings)] },
+      { label: "Opex", values: [yearZero.opex, ...flows.map((flow) => flow.opex)] },
     ]
     : [];
   const salesAnalysisRows = evaluation.impactCategory === "Ventas"
     ? [
       {
-        label: "P.E. U$ / mes",
+        label: "Punto de Equilibrio (U$ por mes)",
         values: [yearZero.breakEvenMonthlyRevenue, ...flows.map((flow) => flow.breakEvenMonthlyRevenue)],
       },
       {
-        label: "P.E. unds / mes",
+        label: "Punto de Equilibrio (Unds por mes)",
         values: [yearZero.breakEvenMonthlyUnits, ...flows.map((flow) => flow.breakEvenMonthlyUnits)],
         type: "number",
       },
       {
-        label: "Margen neto",
+        label: "Margen Neto",
         values: [yearZero.netMarginPct, ...flows.map((flow) => flow.netMarginPct)],
         type: "percent",
         emphasis: true,
@@ -2296,23 +2342,22 @@ function renderCashFlowTable(flows, evaluation) {
   const rows = [
     { label: "Ventas", values: [yearZero.revenue, ...flows.map((flow) => flow.revenue)] },
     ...salesCostRows,
-    { label: "Ahorros", values: [yearZero.savings, ...flows.map((flow) => flow.savings)] },
-    { label: "Opex", values: [yearZero.opex, ...flows.map((flow) => flow.opex)] },
-    { label: "Deprec.", values: [yearZero.depreciation, ...flows.map((flow) => flow.depreciation)] },
+    ...nonSalesOperatingRows,
+    { label: "Depreciaci\u00f3n", values: [yearZero.depreciation, ...flows.map((flow) => flow.depreciation)] },
     { label: "EBIT", values: [yearZero.ebit, ...flows.map((flow) => flow.ebit)], emphasis: true },
     { label: "Impuestos", values: [yearZero.taxes, ...flows.map((flow) => flow.taxes)] },
-    { label: "Utilidad", values: [yearZero.netIncome, ...flows.map((flow) => flow.netIncome)], emphasis: true },
+    { label: "Utilidad Neta", values: [yearZero.netIncome, ...flows.map((flow) => flow.netIncome)], emphasis: true },
     { label: "Flujo neto", values: [yearZero.netFlow, ...flows.map((flow) => flow.netFlow)], emphasis: true },
-    { label: "Flujo desc.", values: [yearZero.discountedFlow, ...flows.map((flow) => flow.discountedFlow)] },
-    { label: "Acum.", values: [yearZero.cumulativeFlow, ...flows.map((flow) => flow.cumulativeFlow)] },
-    { label: "Desc. acum.", values: [yearZero.cumulativeDiscountedFlow, ...flows.map((flow) => flow.cumulativeDiscountedFlow)] },
+    { label: "Flujo descontado", values: [yearZero.discountedFlow, ...flows.map((flow) => flow.discountedFlow)] },
+    { label: "Flujo acumulado", values: [yearZero.cumulativeFlow, ...flows.map((flow) => flow.cumulativeFlow)] },
+    { label: "Flujo descontado acumulado", values: [yearZero.cumulativeDiscountedFlow, ...flows.map((flow) => flow.cumulativeDiscountedFlow)] },
     ...salesAnalysisRows,
   ];
 
   head.innerHTML = `
     <tr>
       <th>Supuestos</th>
-      <th>A0</th>
+      <th>A\u00f1o 0</th>
       ${years.map((year) => `<th>${year}</th>`).join("")}
     </tr>
   `;
@@ -2732,7 +2777,7 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   ];
   if (input.impactCategory === "Ventas") {
     assumptionRows.push(["Unidades A1", number(input.salesUnitsYear1, 0), "Ticket price", currency(input.ticketPrice), "Crec. unidades", percent(input.unitGrowthRate)]);
-    assumptionRows.push(["Costo variable", percent(input.variableCostPct), "Gasto ventas", percent(input.salesExpensePct), "Gasto fijo", currency(input.fixedCommercialCost)]);
+    assumptionRows.push(["Costo variable", percent(input.variableCostPct), "Gasto ventas", percent(input.salesExpensePct), "Gasto fijo", `${currency(input.fixedCommercialCost)} / ${percent(input.fixedCommercialCostGrowthPct || 0)}`]);
   } else if (input.impactCategory === "Ahorro") {
     assumptionRows.push(["Ahorro anual", currency(input.annualCostSavings), "Crec. anual", percent(input.annualGrowthRate), "Impacto", "Ahorro"]);
   } else {
@@ -2759,9 +2804,9 @@ async function buildDetailedExecutivePdf(input, evaluation) {
 
   const page2 = startPage("DETALLE DE FLUJOS", input.projectName || "Proyecto CAPEX");
   sectionTitle(page2, "Matriz de flujos y resultados", margin, 680, 150);
-  const years = evaluation.flows.map((flow) => `A${flow.year}`);
+  const years = evaluation.flows.map((flow) => `A\u00f1o ${flow.year}`);
   const yearZero = {
-    revenue: 0,
+    revenue: input.impactCategory === "Ventas" ? evaluation.totalInvestment : 0,
     savings: 0,
     variableCost: 0,
     salesExpense: 0,
@@ -2781,31 +2826,36 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   };
   const salesCostRows = input.impactCategory === "Ventas"
     ? [
-      { label: "Costos var.", values: [yearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
-      { label: "Gastos venta", values: [yearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
+      { label: "Costo de venta", values: [yearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
+      { label: "Gasto variable", values: [yearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
       { label: "Gasto fijo", values: [yearZero.fixedCost, ...evaluation.flows.map((flow) => flow.fixedCost)] },
+    ]
+    : [];
+  const nonSalesOperatingRows = input.impactCategory !== "Ventas"
+    ? [
+      { label: "Ahorros", values: [yearZero.savings, ...evaluation.flows.map((flow) => flow.savings)] },
+      { label: "Opex", values: [yearZero.opex, ...evaluation.flows.map((flow) => flow.opex)] },
     ]
     : [];
   const salesAnalysisRows = input.impactCategory === "Ventas"
     ? [
       { label: "P.E. U$ / mes", values: [yearZero.breakEvenMonthlyRevenue, ...evaluation.flows.map((flow) => flow.breakEvenMonthlyRevenue)] },
       { label: "P.E. unds / mes", values: [yearZero.breakEvenMonthlyUnits, ...evaluation.flows.map((flow) => flow.breakEvenMonthlyUnits)], type: "number" },
-      { label: "Margen neto", values: [yearZero.netMarginPct, ...evaluation.flows.map((flow) => flow.netMarginPct)], type: "percent", emphasis: true },
+      { label: "Margen Neto", values: [yearZero.netMarginPct, ...evaluation.flows.map((flow) => flow.netMarginPct)], type: "percent", emphasis: true },
     ]
     : [];
   const flowRows = [
     { label: "Ventas", values: [yearZero.revenue, ...evaluation.flows.map((flow) => flow.revenue)] },
     ...salesCostRows,
-    { label: "Ahorros", values: [yearZero.savings, ...evaluation.flows.map((flow) => flow.savings)] },
-    { label: "Opex", values: [yearZero.opex, ...evaluation.flows.map((flow) => flow.opex)] },
-    { label: "Deprec.", values: [yearZero.depreciation, ...evaluation.flows.map((flow) => flow.depreciation)] },
+    ...nonSalesOperatingRows,
+    { label: "Depreciacion", values: [yearZero.depreciation, ...evaluation.flows.map((flow) => flow.depreciation)] },
     { label: "EBIT", values: [yearZero.ebit, ...evaluation.flows.map((flow) => flow.ebit)], emphasis: true },
     { label: "Impuestos", values: [yearZero.taxes, ...evaluation.flows.map((flow) => flow.taxes)] },
-    { label: "Utilidad", values: [yearZero.netIncome, ...evaluation.flows.map((flow) => flow.netIncome)], emphasis: true },
+    { label: "Utilidad Neta", values: [yearZero.netIncome, ...evaluation.flows.map((flow) => flow.netIncome)], emphasis: true },
     { label: "Flujo neto", values: [yearZero.netFlow, ...evaluation.flows.map((flow) => flow.netFlow)], emphasis: true },
-    { label: "Flujo desc.", values: [yearZero.discountedFlow, ...evaluation.flows.map((flow) => flow.discountedFlow)] },
-    { label: "Acum.", values: [yearZero.cumulativeFlow, ...evaluation.flows.map((flow) => flow.cumulativeFlow)] },
-    { label: "Desc. acum.", values: [yearZero.cumulativeDiscountedFlow, ...evaluation.flows.map((flow) => flow.cumulativeDiscountedFlow)] },
+    { label: "Flujo descontado", values: [yearZero.discountedFlow, ...evaluation.flows.map((flow) => flow.discountedFlow)] },
+    { label: "Flujo acumulado", values: [yearZero.cumulativeFlow, ...evaluation.flows.map((flow) => flow.cumulativeFlow)] },
+    { label: "Flujo desc. acum.", values: [yearZero.cumulativeDiscountedFlow, ...evaluation.flows.map((flow) => flow.cumulativeDiscountedFlow)] },
     ...salesAnalysisRows,
   ];
   const tableX = margin;
@@ -2816,7 +2866,7 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   const tableFont = valueColWidth < 44 ? 6.1 : 7;
   fillRect(page2, tableX, tableY, contentWidth, rowHeight, "#10253f");
   addText(page2, "Supuestos", tableX + 5, tableY + 7, 7.2, "#ffffff", "F2");
-  ["A0", ...years].forEach((year, index) => {
+  ["A\u00f1o 0", ...years].forEach((year, index) => {
     addText(page2, year, tableX + labelWidth + index * valueColWidth + 4, tableY + 7, 7, "#ffffff", "F2");
   });
   const pdfTableValue = (value, type) => {
@@ -3083,7 +3133,7 @@ function buildExcelWorkbook(input, evaluation) {
   if (input.impactCategory === "Ventas") {
     assumptionRows.push(
       ["Unidades A1", number(input.salesUnitsYear1, 0), "Ticket price", currency(input.ticketPrice), "Crec. unidades", percent(input.unitGrowthRate)],
-      ["Costo variable", percent(input.variableCostPct), "Gasto ventas", percent(input.salesExpensePct), "Gasto fijo", currency(input.fixedCommercialCost)]
+      ["Costo variable", percent(input.variableCostPct), "Gasto ventas", percent(input.salesExpensePct), "Gasto fijo", `${currency(input.fixedCommercialCost)} / ${percent(input.fixedCommercialCostGrowthPct || 0)}`]
     );
   } else if (input.impactCategory === "Ahorro") {
     assumptionRows.push(["Ahorro anual", currency(input.annualCostSavings), "Crec. anual", percent(input.annualGrowthRate), "Impacto", "Ahorro"]);
@@ -3117,7 +3167,7 @@ function buildExcelWorkbook(input, evaluation) {
 
   const years = evaluation.flows.map((flow) => `A${flow.year}`);
   const excelYearZero = {
-    revenue: 0,
+    revenue: input.impactCategory === "Ventas" ? evaluation.totalInvestment : 0,
     savings: 0,
     variableCost: 0,
     salesExpense: 0,
@@ -3137,31 +3187,36 @@ function buildExcelWorkbook(input, evaluation) {
   };
   const excelSalesCostRows = input.impactCategory === "Ventas"
     ? [
-      { label: "Costos var.", values: [excelYearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
-      { label: "Gastos venta", values: [excelYearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
+      { label: "Costo de venta", values: [excelYearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
+      { label: "Gasto variable", values: [excelYearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
       { label: "Gasto fijo", values: [excelYearZero.fixedCost, ...evaluation.flows.map((flow) => flow.fixedCost)] },
+    ]
+    : [];
+  const excelNonSalesOperatingRows = input.impactCategory !== "Ventas"
+    ? [
+      { label: "Ahorros", values: [excelYearZero.savings, ...evaluation.flows.map((flow) => flow.savings)] },
+      { label: "Opex", values: [excelYearZero.opex, ...evaluation.flows.map((flow) => flow.opex)] },
     ]
     : [];
   const excelSalesAnalysisRows = input.impactCategory === "Ventas"
     ? [
-      { label: "P.E. U$ / mes", values: [excelYearZero.breakEvenMonthlyRevenue, ...evaluation.flows.map((flow) => flow.breakEvenMonthlyRevenue)] },
-      { label: "P.E. unds / mes", values: [excelYearZero.breakEvenMonthlyUnits, ...evaluation.flows.map((flow) => flow.breakEvenMonthlyUnits)], type: "number" },
-      { label: "Margen neto", values: [excelYearZero.netMarginPct, ...evaluation.flows.map((flow) => flow.netMarginPct)], type: "percent", emphasis: true },
+      { label: "Punto de Equilibrio (U$ por mes)", values: [excelYearZero.breakEvenMonthlyRevenue, ...evaluation.flows.map((flow) => flow.breakEvenMonthlyRevenue)] },
+      { label: "Punto de Equilibrio (Unds por mes)", values: [excelYearZero.breakEvenMonthlyUnits, ...evaluation.flows.map((flow) => flow.breakEvenMonthlyUnits)], type: "number" },
+      { label: "Margen Neto", values: [excelYearZero.netMarginPct, ...evaluation.flows.map((flow) => flow.netMarginPct)], type: "percent", emphasis: true },
     ]
     : [];
   const excelFlowMatrixRows = [
     { label: "Ventas", values: [excelYearZero.revenue, ...evaluation.flows.map((flow) => flow.revenue)] },
     ...excelSalesCostRows,
-    { label: "Ahorros", values: [excelYearZero.savings, ...evaluation.flows.map((flow) => flow.savings)] },
-    { label: "Opex", values: [excelYearZero.opex, ...evaluation.flows.map((flow) => flow.opex)] },
-    { label: "Deprec.", values: [excelYearZero.depreciation, ...evaluation.flows.map((flow) => flow.depreciation)] },
+    ...excelNonSalesOperatingRows,
+    { label: "Depreciaci\u00f3n", values: [excelYearZero.depreciation, ...evaluation.flows.map((flow) => flow.depreciation)] },
     { label: "EBIT", values: [excelYearZero.ebit, ...evaluation.flows.map((flow) => flow.ebit)], emphasis: true },
     { label: "Impuestos", values: [excelYearZero.taxes, ...evaluation.flows.map((flow) => flow.taxes)] },
-    { label: "Utilidad", values: [excelYearZero.netIncome, ...evaluation.flows.map((flow) => flow.netIncome)], emphasis: true },
+    { label: "Utilidad Neta", values: [excelYearZero.netIncome, ...evaluation.flows.map((flow) => flow.netIncome)], emphasis: true },
     { label: "Flujo neto", values: [excelYearZero.netFlow, ...evaluation.flows.map((flow) => flow.netFlow)], emphasis: true },
-    { label: "Flujo desc.", values: [excelYearZero.discountedFlow, ...evaluation.flows.map((flow) => flow.discountedFlow)] },
-    { label: "Acum.", values: [excelYearZero.cumulativeFlow, ...evaluation.flows.map((flow) => flow.cumulativeFlow)] },
-    { label: "Desc. acum.", values: [excelYearZero.cumulativeDiscountedFlow, ...evaluation.flows.map((flow) => flow.cumulativeDiscountedFlow)] },
+    { label: "Flujo descontado", values: [excelYearZero.discountedFlow, ...evaluation.flows.map((flow) => flow.discountedFlow)] },
+    { label: "Flujo acumulado", values: [excelYearZero.cumulativeFlow, ...evaluation.flows.map((flow) => flow.cumulativeFlow)] },
+    { label: "Flujo descontado acumulado", values: [excelYearZero.cumulativeDiscountedFlow, ...evaluation.flows.map((flow) => flow.cumulativeDiscountedFlow)] },
     ...excelSalesAnalysisRows,
   ];
   const matrixValueCell = (value, rowDefinition) => {
@@ -3179,7 +3234,7 @@ function buildExcelWorkbook(input, evaluation) {
   const detailedFlowRows = [
     row([cell("DETALLE DE FLUJOS", { style: "Title", mergeAcross: years.length + 1 })], { height: 34 }),
     blankRow,
-    row(["Supuestos", "A0", ...years].map((label) => cell(label, { style: "TableHeader" })), { height: 24 }),
+    row(["Supuestos", "A\u00f1o 0", ...years.map((year) => year.replace("A", "A\u00f1o "))].map((label) => cell(label, { style: "TableHeader" })), { height: 24 }),
     ...excelFlowMatrixRows.map((flowRow) =>
       row([
         cell(flowRow.label, { style: flowRow.emphasis ? "TableCellStrong" : "TableCell" }),
@@ -3318,6 +3373,38 @@ function exportExcelWorkbook() {
   statusNode.textContent = `Archivo Excel generado para "${input.projectName}".`;
 }
 
+async function sendEvaluationToSharePoint() {
+  const flowUrl = getPowerAutomateFlowUrl();
+  if (!flowUrl) {
+    statusNode.textContent = "Falta configurar la URL del flujo de Power Automate para guardar la solicitud.";
+    return;
+  }
+
+  const { input, evaluation } = getEvaluationPackage();
+  const payload = buildSharePointPayload(input, evaluation);
+  sendSharePointButton.disabled = true;
+  statusNode.textContent = `Guardando solicitud CAPEX "${input.projectName}"...`;
+
+  try {
+    const response = await fetch(flowUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Power Automate respondio ${response.status}`);
+    }
+
+    statusNode.textContent = `Solicitud CAPEX "${input.projectName}" guardada correctamente.`;
+  } catch (error) {
+    console.error(error);
+    statusNode.textContent = "No se pudo guardar la solicitud. Revisa la URL del flujo, CORS o el historial de Power Automate.";
+  } finally {
+    sendSharePointButton.disabled = false;
+  }
+}
+
 function evaluateProject(options = {}) {
   const shouldSave = options.persist !== false;
   const input = getInputs();
@@ -3355,6 +3442,9 @@ if (evaluateButton) {
   evaluateButton.addEventListener("click", evaluateProject);
 }
 newCapexButton.addEventListener("click", startNewCapex);
+if (sendSharePointButton) {
+  sendSharePointButton.addEventListener("click", sendEvaluationToSharePoint);
+}
 downloadPdfButton.addEventListener("click", exportExecutivePdf);
 downloadExcelButton.addEventListener("click", exportExcelWorkbook);
 elements.businessArea.addEventListener("change", () => syncSponsorByArea());

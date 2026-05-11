@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluador CAPEX</title>
-  <link rel="stylesheet" href="styles.css?v=20260429-06">
+  <link rel="stylesheet" href="styles.css?v=20260429-10">
 </head>
 <body>
   <div class="page-shell">
@@ -316,6 +316,10 @@
               <span>Gasto fijo incremental anual</span>
               <input id="fixedCommercialCost" type="number" min="0" step="1000" value="78000">
             </label>
+            <label class="impact-field" data-impact="Ventas">
+              <span>% gasto fijo incremental</span>
+              <input id="fixedCommercialCostGrowthPct" type="number" min="-100" max="100" step="0.1" value="0">
+            </label>
             <label class="impact-field" data-impact="legacy">
               <span>Incremento de ingresos anual</span>
               <input id="annualRevenueIncrease" type="number" min="0" step="1000" value="180000">
@@ -398,6 +402,7 @@
           <div>
             <h2>Evaluaci&oacute;n y Recomendaci&oacute;n del Proyecto</h2>
           </div>
+          <button id="sendSharePoint" class="save-request-button" type="button">Guardar Solicitud</button>
         </div>
 
         <article class="summary-strip">
@@ -461,6 +466,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=20260429-30"></script>
+  <script src="app.js?v=20260429-41"></script>
 </body>
 </html>

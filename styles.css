@@ -506,6 +506,29 @@ textarea:focus {
   transform: translateY(-1px);
 }
 
+.save-request-button {
+  border: 0;
+  border-radius: 6px;
+  padding: 11px 18px;
+  min-width: 170px;
+  font: inherit;
+  font-weight: 800;
+  color: #ffffff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #334155, #111827);
+  box-shadow: 0 12px 24px rgba(17, 24, 39, 0.28);
+}
+
+.save-request-button:hover {
+  transform: translateY(-1px);
+}
+
+.save-request-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
+
 .secondary-button {
   border: 1px solid rgba(31, 54, 179, 0.18);
   border-radius: 6px;
@@ -969,7 +992,7 @@ canvas {
 }
 
 .cashflow-detail-card .table-wrap {
-  overflow-x: visible;
+  overflow-x: auto;
 }
 
 .strategy-block {
@@ -1088,7 +1111,7 @@ canvas {
 .cashflow-matrix {
   width: 100%;
   border-collapse: collapse;
-  min-width: 0;
+  min-width: 760px;
   table-layout: fixed;
 }
 
@@ -1113,7 +1136,8 @@ canvas {
 .cashflow-matrix th:first-child,
 .cashflow-matrix td:first-child {
   text-align: left;
-  width: 118px;
+  width: 190px;
+  white-space: normal;
 }
 
 .cashflow-matrix td.negative {
@@ -1214,8 +1238,17 @@ canvas {
   .two-wide,
   .action-row,
   .impact-options,
+  .panel-header,
   .wizard-controls {
     grid-template-columns: 1fr;
+  }
+
+  .panel-header {
+    align-items: stretch;
+  }
+
+  .save-request-button {
+    width: 100%;
   }
 
   .wizard-steps,
