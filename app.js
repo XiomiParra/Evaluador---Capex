@@ -1174,7 +1174,7 @@ function getValidationMessages(input, evaluation) {
         add("danger", "Ventas incompletas", "Para ventas, unidades y precio promedio deben ser mayores que cero.");
       }
       if (totalSalesCostPct >= 100) {
-        add("danger", "Margen negativo", "Costo variable mas gasto de ventas debe ser menor que 100%.");
+        add("danger", "Margen negativo", "La suma de costo variable y % Costo de Venta debe ser menor que 100%.");
       }
       if (evaluation.breakEvenMonthlyUnits && input.salesUnitsYear1 / 12 < evaluation.breakEvenMonthlyUnits) {
         add("warning", "Punto de equilibrio alto", "Las unidades esperadas del ano 1 no cubren el punto de equilibrio mensual.");
@@ -1223,7 +1223,7 @@ function getValidationMessages(input, evaluation) {
       add("danger", "Ventas incompletas", "Para un CAPEX de crecimiento, unidades y precio promedio deben ser mayores que cero.");
     }
     if (totalSalesCostPct >= 100) {
-      add("danger", "Margen negativo", "Costo variable mas gasto de ventas no deberia llegar a 100% de ventas.");
+      add("danger", "Margen negativo", "La suma de costo variable y % Costo de Venta no deberia llegar a 100% de ventas.");
     }
     if (evaluation.breakEvenMonthlyUnits && input.salesUnitsYear1 / 12 < evaluation.breakEvenMonthlyUnits) {
       add("warning", "Punto de equilibrio alto", "Las unidades esperadas del ano 1 no cubren el punto de equilibrio mensual.");
@@ -1344,7 +1344,7 @@ function validateCurrentStep() {
       if (input.salesUnitsYear1 <= 0) add("salesUnitsYear1", "Ingresa unidades estimadas mayores que cero.");
       if (input.ticketPrice <= 0) add("ticketPrice", "Ingresa un precio promedio mayor que cero.");
       if (input.variableCostPct + input.salesExpensePct >= 100) {
-        add("salesExpensePct", "Costo variable mas gasto de ventas debe ser menor a 100%.");
+        add("salesExpensePct", "La suma de costo variable y % Costo de Venta debe ser menor a 100%.");
       }
       if (input.fixedCommercialCostGrowthPct < -100 || input.fixedCommercialCostGrowthPct > 100) {
         add("fixedCommercialCostGrowthPct", "Usa un porcentaje de gasto fijo entre -100% y 100%.");
@@ -2769,7 +2769,7 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   ];
   if (input.impactCategory === "Ventas") {
     assumptionRows.push(["Unidades A1", number(input.salesUnitsYear1, 0), "Ticket price", currency(input.ticketPrice), "Crec. unidades", percent(input.unitGrowthRate)]);
-    assumptionRows.push(["Costo variable", percent(input.variableCostPct), "Gasto ventas", percent(input.salesExpensePct), "Gasto fijo", `${currency(input.fixedCommercialCost)} / ${percent(input.fixedCommercialCostGrowthPct || 0)}`]);
+    assumptionRows.push(["Costo variable", percent(input.variableCostPct), "% Costo de Venta", percent(input.salesExpensePct), "Gasto fijo", `${currency(input.fixedCommercialCost)} / ${percent(input.fixedCommercialCostGrowthPct || 0)}`]);
   } else if (input.impactCategory === "Ahorro") {
     assumptionRows.push(["Ahorro anual", currency(input.annualCostSavings), "Crec. anual", percent(input.annualGrowthRate), "Impacto", "Ahorro"]);
   } else {
@@ -3125,7 +3125,7 @@ function buildExcelWorkbook(input, evaluation) {
   if (input.impactCategory === "Ventas") {
     assumptionRows.push(
       ["Unidades A1", number(input.salesUnitsYear1, 0), "Ticket price", currency(input.ticketPrice), "Crec. unidades", percent(input.unitGrowthRate)],
-      ["Costo variable", percent(input.variableCostPct), "Gasto ventas", percent(input.salesExpensePct), "Gasto fijo", `${currency(input.fixedCommercialCost)} / ${percent(input.fixedCommercialCostGrowthPct || 0)}`]
+      ["Costo variable", percent(input.variableCostPct), "% Costo de Venta", percent(input.salesExpensePct), "Gasto fijo", `${currency(input.fixedCommercialCost)} / ${percent(input.fixedCommercialCostGrowthPct || 0)}`]
     );
   } else if (input.impactCategory === "Ahorro") {
     assumptionRows.push(["Ahorro anual", currency(input.annualCostSavings), "Crec. anual", percent(input.annualGrowthRate), "Impacto", "Ahorro"]);
