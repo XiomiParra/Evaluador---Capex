@@ -5,6 +5,7 @@ const fieldIds = [
   "businessUnit",
   "sponsor",
   "impactCategory",
+  "annualTemplatePayload",
   "strategicFocus",
   "maltaProject",
   "otherMaltaJustification",
@@ -491,6 +492,9 @@ const newCapexButton = document.getElementById("newCapex");
 const sendSharePointButton = document.getElementById("sendSharePoint");
 const downloadPdfButton = document.getElementById("downloadPdf");
 const downloadExcelButton = document.getElementById("downloadExcel");
+const downloadAnnualTemplateButton = document.getElementById("downloadAnnualTemplate");
+const uploadAnnualTemplateInput = document.getElementById("uploadAnnualTemplate");
+const annualTemplateStatus = document.getElementById("annualTemplateStatus");
 const impactCategoryOptions = document.getElementById("impactCategoryOptions");
 const strategyOptions = document.getElementById("strategyOptions");
 const dashboard = document.querySelector(".dashboard");
@@ -508,9 +512,12 @@ const formFlowTitle = document.querySelector(".form-flow-title");
 let latestInput = null;
 let latestEvaluation = null;
 let currentWizardStep = 0;
+let annualTemplateState = null;
 const LAST_CAPEX_STORAGE_KEY = "capex:lastRegistered";
 const PROJECT_CODE_SEQUENCE_KEY = "capex:projectCodeSequence";
 const PROJECT_CODE_MAX_SERIAL = 999;
+const ANNUAL_TEMPLATE_MAX_YEARS = 10;
+const ANNUAL_TEMPLATE_MIN_YEARS = 3;
 const POWER_AUTOMATE_FLOW_URL = "https://defaultc663fba5d30a453ab2819f692716d5.16.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/78854a17efc646e792183394406d43b4/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=YgyruCEaCF92XG2XGYzBAOgZnuvYghTaFQ2LloiGnFg";
 const POWER_AUTOMATE_FLOW_URL_STORAGE_KEY = "capex:powerAutomateFlowUrl";
 
@@ -735,8 +742,9 @@ function getInputs() {
     riskReduction: operationalUrgencyValue,
     executionReadiness: strategicAlignmentValue,
   };
+  applyAnnualTemplateToInput(input);
 
-  if (input.impactCategory === "Ahorro") {
+  if (input.impactCategory === "Ahorro" && !input.annualTemplate) {
     input.annualOpexIncrease = 0;
     input.riskAvoidanceBenefit = 0;
   }
@@ -772,6 +780,15 @@ function restoreLastCapex() {
     Object.entries(parsed.input).forEach(([id, value]) => {
       setFieldValue(id, value);
     });
+    let restoredAnnualTemplate = null;
+    if (parsed.input.annualTemplatePayload) {
+      try {
+        restoredAnnualTemplate = JSON.parse(parsed.input.annualTemplatePayload);
+      } catch (error) {
+        restoredAnnualTemplate = null;
+      }
+    }
+    setAnnualTemplateState(restoredAnnualTemplate);
     rememberProjectCodeSerial(parsed.input.projectCode);
     if (!getProjectCodeSerial(elements.projectCode?.value)) {
       elements.projectCode.value = generateProjectCode();
@@ -792,6 +809,9 @@ function restoreLastCapex() {
     syncImpactCategory(parsed.input.impactCategory || "Ventas");
     syncStrategicFocus(parsed.input.strategicFocus || "Ventas");
     syncOtherMaltaJustification();
+    if (restoredAnnualTemplate) {
+      applyAnnualTemplateToForm(restoredAnnualTemplate);
+    }
     return true;
   } catch (error) {
     console.warn("No se pudo recuperar el ultimo CAPEX.", error);
@@ -1395,6 +1415,7 @@ function startNewCapex() {
     businessArea: "Divisi\u00f3n Repuestos",
     businessUnit: "Repuestos Genuinos",
     impactCategory: "Ventas",
+    annualTemplatePayload: "",
     projectType: "Crecimiento",
     projectGoal: "",
     maltaProject: "",
@@ -1440,6 +1461,7 @@ function startNewCapex() {
   };
 
   Object.entries(defaults).forEach(([id, value]) => setFieldValue(id, value));
+  setAnnualTemplateState(null);
   syncSponsorByArea();
   applyCapexTemplate("Crecimiento", { updateStatus: false });
   setWizardStep(0);
@@ -1519,6 +1541,559 @@ function openBlob(blob) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+function isFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function parseTemplateNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const negative = /^\(.*\)$/.test(raw);
+  let normalized = raw
+    .replace(/\u00a0/g, " ")
+    .replace(/USD/gi, "")
+    .replace(/C\$/gi, "")
+    .replace(/\$/g, "")
+    .replace(/%/g, "")
+    .replace(/[()]/g, "")
+    .trim();
+
+  if (normalized.includes(",") && normalized.includes(".")) {
+    normalized = normalized.replace(/,/g, "");
+  } else if (normalized.includes(",") && !normalized.includes(".")) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const parsed = Number(normalized.replace(/\s+/g, ""));
+  if (!Number.isFinite(parsed)) return null;
+  return negative ? -parsed : parsed;
+}
+
+function normalizeImpactCategoryValue(value) {
+  const normalized = normalizeLookupText(value);
+  if (normalized.includes("ahorro")) return "Ahorro";
+  if (normalized.includes("sin impacto") || normalized.includes("no genera")) return "No genera impacto economico";
+  return "Ventas";
+}
+
+function getTemplateYears(value = getInputValue("projectLife")) {
+  return Math.max(ANNUAL_TEMPLATE_MIN_YEARS, Math.min(ANNUAL_TEMPLATE_MAX_YEARS, Math.round(Number(value) || 5)));
+}
+
+function deriveAnnualTemplateRows(input, years = getTemplateYears(input.projectLife)) {
+  const rows = [];
+  for (let year = 1; year <= years; year += 1) {
+    const unitGrowthFactor = (1 + (Number(input.unitGrowthRate) || 0) / 100) ** (year - 1);
+    const savingsGrowthFactor = (1 + (Number(input.annualGrowthRate) || 0) / 100) ** (year - 1);
+    const fixedGrowthFactor = (1 + (Number(input.fixedCommercialCostGrowthPct) || 0) / 100) ** (year - 1);
+    rows.push({
+      year,
+      units: (Number(input.salesUnitsYear1) || 0) * unitGrowthFactor,
+      unitGrowthPct: year === 1 ? 0 : Number(input.unitGrowthRate) || 0,
+      ticketPrice: Number(input.ticketPrice) || 0,
+      variableCostPct: Number(input.variableCostPct) || 0,
+      salesExpensePct: Number(input.salesExpensePct) || 0,
+      fixedCost: (Number(input.fixedCommercialCost) || 0) * fixedGrowthFactor,
+      fixedCostGrowthPct: year === 1 ? 0 : Number(input.fixedCommercialCostGrowthPct) || 0,
+      savings: (Number(input.annualCostSavings) || 0) * savingsGrowthFactor,
+      savingsGrowthPct: year === 1 ? 0 : Number(input.annualGrowthRate) || 0,
+      riskBenefit: (Number(input.riskAvoidanceBenefit) || 0) * savingsGrowthFactor,
+      opex: (Number(input.annualOpexIncrease) || 0) * savingsGrowthFactor,
+      depreciation: Number(input.annualDepreciation) || 0,
+    });
+  }
+  return rows;
+}
+
+function buildAnnualTemplateWorkbook(input) {
+  const years = getTemplateYears(input.projectLife);
+  const annualRows = input.annualTemplate?.annual?.length
+    ? input.annualTemplate.annual.slice(0, years)
+    : deriveAnnualTemplateRows(input, years);
+  const yearCells = Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS + 1 }, (_, index) => index);
+  const cell = (value, style = "") => {
+    const isNumber = typeof value === "number" && Number.isFinite(value);
+    const type = isNumber ? "Number" : "String";
+    const styleAttr = style ? ` ss:StyleID="${style}"` : "";
+    return `<Cell${styleAttr}><Data ss:Type="${type}">${isNumber ? value : escapeXml(value ?? "")}</Data></Cell>`;
+  };
+  const row = (items, style = "") => `<Row>${items.map((item) => cell(item, style)).join("")}</Row>`;
+  const annualValue = (key, year) => annualRows[year - 1]?.[key] ?? "";
+  const templateRows = [
+    ["impactCategory", "Tipo de impacto", input.impactCategory || "Ventas", ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["projectLife", "Horizonte del analisis", years, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["equipmentCost", "Equipos principales", Number(input.equipmentCost) || 0, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["installationCost", "Instalacion y/o implementacion", Number(input.installationCost) || 0, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["propertyInfrastructureCost", "Propiedades e infraestructura", Number(input.propertyInfrastructureCost) || 0, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["trainingCost", "Capacitacion", Number(input.trainingCost) || 0, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["otherCosts", "Otros costos", Number(input.otherCosts) || 0, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["workingCapital", "Capital de trabajo", Number(input.workingCapital) || 0, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["salvageValue", "Valor residual final", Number(input.salvageValue) || 0, ...Array(ANNUAL_TEMPLATE_MAX_YEARS).fill("")],
+    ["salesUnits", "Ventas: unidades", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("units", index + 1))],
+    ["unitGrowthPct", "Ventas: crecimiento unidades %", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("unitGrowthPct", index + 1))],
+    ["ticketPrice", "Ventas: ticket price", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("ticketPrice", index + 1))],
+    ["variableCostPct", "Ventas: costo variable %", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("variableCostPct", index + 1))],
+    ["salesExpensePct", "Ventas: % Costo de Venta", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("salesExpensePct", index + 1))],
+    ["fixedCost", "Ventas: gasto fijo incremental", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("fixedCost", index + 1))],
+    ["fixedCostGrowthPct", "Ventas: crecimiento gasto fijo %", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("fixedCostGrowthPct", index + 1))],
+    ["savings", "Ahorro: ahorro anual", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("savings", index + 1))],
+    ["savingsGrowthPct", "Ahorro: crecimiento ahorro %", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("savingsGrowthPct", index + 1))],
+    ["riskBenefit", "Riesgo evitado / beneficio cualitativo", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("riskBenefit", index + 1))],
+    ["annualOpexIncrease", "Costos operativos incrementales", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("opex", index + 1))],
+    ["annualDepreciation", "Depreciacion anual", "", ...Array.from({ length: ANNUAL_TEMPLATE_MAX_YEARS }, (_, index) => annualValue("depreciation", index + 1))],
+  ];
+  const worksheetRows = [
+    row(["Codigo", "Variable", ...yearCells.map((year) => `Ano ${year}`)], "Header"),
+    ...templateRows.map((items) => row(items)),
+  ].join("");
+  const columns = Array.from({ length: 13 }, (_, index) => `<Column ss:Width="${index < 2 ? 160 : 88}"/>`).join("");
+  const workbook = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles>
+    <Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Calibri" ss:Size="10" ss:Color="#15356F"/></Style>
+    <Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#33475E" ss:Pattern="Solid"/></Style>
+  </Styles>
+  <Worksheet ss:Name="Plantilla CAPEX">
+    <Table>${columns}${worksheetRows}</Table>
+  </Worksheet>
+</Workbook>`;
+  return new Blob([workbook], { type: "application/vnd.ms-excel" });
+}
+
+function getSpreadsheetRowsFromText(text) {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(text, "text/xml");
+  const hasParserError = xmlDoc.getElementsByTagName("parsererror").length > 0;
+  const sourceDoc = hasParserError ? parser.parseFromString(text, "text/html") : xmlDoc;
+  const rowNodes = Array.from(sourceDoc.getElementsByTagName("*")).filter((node) => node.localName === "Row" || node.localName === "tr");
+
+  return rowNodes.map((rowNode) => {
+    const cells = [];
+    let position = 0;
+    Array.from(rowNode.children || [])
+      .filter((node) => node.localName === "Cell" || node.localName === "td" || node.localName === "th")
+      .forEach((cellNode) => {
+        const indexAttr = cellNode.getAttribute("ss:Index") || cellNode.getAttribute("Index");
+        if (indexAttr) position = Math.max(0, Number(indexAttr) - 1);
+        const dataNode = Array.from(cellNode.children || []).find((node) => node.localName === "Data");
+        cells[position] = (dataNode || cellNode).textContent.trim();
+        position += 1;
+      });
+    return cells;
+  }).filter((rowData) => rowData.some((value) => String(value || "").trim()));
+}
+
+function parseAnnualTemplateWorkbook(text, sourceName = "plantilla") {
+  const rows = getSpreadsheetRowsFromText(text);
+  const rowMap = new Map();
+  rows.forEach((rowData) => {
+    const key = normalizeLookupText(rowData[0]);
+    if (key && key !== "codigo") {
+      rowMap.set(key, rowData.slice(2));
+    }
+  });
+
+  const readText = (key, yearIndex = 0) => rowMap.get(normalizeLookupText(key))?.[yearIndex] || "";
+  const readNumber = (key, yearIndex = 0) => parseTemplateNumber(readText(key, yearIndex));
+  const impactCategory = normalizeImpactCategoryValue(readText("impactCategory") || getInputValue("impactCategory"));
+  const projectLife = readNumber("projectLife") || getInputValue("projectLife");
+  const years = getTemplateYears(projectLife);
+  const investment = {
+    equipmentCost: readNumber("equipmentCost") ?? Number(getInputValue("equipmentCost")) ?? 0,
+    installationCost: readNumber("installationCost") ?? Number(getInputValue("installationCost")) ?? 0,
+    propertyInfrastructureCost: readNumber("propertyInfrastructureCost") ?? Number(getInputValue("propertyInfrastructureCost")) ?? 0,
+    trainingCost: readNumber("trainingCost") ?? Number(getInputValue("trainingCost")) ?? 0,
+    otherCosts: readNumber("otherCosts") ?? Number(getInputValue("otherCosts")) ?? 0,
+    workingCapital: readNumber("workingCapital") ?? Number(getInputValue("workingCapital")) ?? 0,
+    salvageValue: readNumber("salvageValue") ?? Number(getInputValue("salvageValue")) ?? 0,
+  };
+  const annual = [];
+  let previousUnits = readNumber("salesUnits", 1) ?? Number(getInputValue("salesUnitsYear1")) ?? 0;
+  let previousFixedCost = readNumber("fixedCost", 1) ?? Number(getInputValue("fixedCommercialCost")) ?? 0;
+  let previousSavings = readNumber("savings", 1) ?? Number(getInputValue("annualCostSavings")) ?? 0;
+
+  for (let year = 1; year <= years; year += 1) {
+    const growthIndex = year;
+    const unitGrowthPct = readNumber("unitGrowthPct", growthIndex) ?? (year === 1 ? 0 : Number(getInputValue("unitGrowthRate")) || 0);
+    const fixedGrowthPct = readNumber("fixedCostGrowthPct", growthIndex) ?? (year === 1 ? 0 : Number(getInputValue("fixedCommercialCostGrowthPct")) || 0);
+    const savingsGrowthPct = readNumber("savingsGrowthPct", growthIndex) ?? (year === 1 ? 0 : Number(getInputValue("annualGrowthRate")) || 0);
+    const units = readNumber("salesUnits", growthIndex) ?? (year === 1 ? previousUnits : previousUnits * (1 + unitGrowthPct / 100));
+    const fixedCost = readNumber("fixedCost", growthIndex) ?? (year === 1 ? previousFixedCost : previousFixedCost * (1 + fixedGrowthPct / 100));
+    const savings = readNumber("savings", growthIndex) ?? (year === 1 ? previousSavings : previousSavings * (1 + savingsGrowthPct / 100));
+    previousUnits = units;
+    previousFixedCost = fixedCost;
+    previousSavings = savings;
+    annual.push({
+      year,
+      units,
+      unitGrowthPct,
+      ticketPrice: readNumber("ticketPrice", growthIndex) ?? Number(getInputValue("ticketPrice")) ?? 0,
+      variableCostPct: readNumber("variableCostPct", growthIndex) ?? Number(getInputValue("variableCostPct")) ?? 0,
+      salesExpensePct: readNumber("salesExpensePct", growthIndex) ?? Number(getInputValue("salesExpensePct")) ?? 0,
+      fixedCost,
+      fixedCostGrowthPct: fixedGrowthPct,
+      savings,
+      savingsGrowthPct,
+      riskBenefit: readNumber("riskBenefit", growthIndex) ?? Number(getInputValue("riskAvoidanceBenefit")) ?? 0,
+      opex: readNumber("annualOpexIncrease", growthIndex) ?? Number(getInputValue("annualOpexIncrease")) ?? 0,
+      depreciation: readNumber("annualDepreciation", growthIndex) ?? Number(getInputValue("annualDepreciation")) ?? 0,
+    });
+  }
+
+  return {
+    sourceName,
+    loadedAt: new Date().toISOString(),
+    impactCategory,
+    years,
+    investment,
+    annual,
+  };
+}
+
+function getXmlNodesByLocalName(doc, localName) {
+  return Array.from(doc.getElementsByTagName("*")).filter((node) => node.localName === localName);
+}
+
+function getRelationshipId(node) {
+  return node?.getAttribute("r:id")
+    || node?.getAttribute("id")
+    || node?.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id")
+    || "";
+}
+
+function resolveWorkbookTarget(target) {
+  const cleaned = String(target || "worksheets/sheet1.xml").replace(/^\/+/, "");
+  return cleaned.startsWith("xl/") ? cleaned : `xl/${cleaned}`;
+}
+
+function getXlsxCellText(cellNode, sharedStrings) {
+  const type = cellNode.getAttribute("t");
+  if (type === "inlineStr") {
+    return getXmlNodesByLocalName(cellNode, "t").map((node) => node.textContent || "").join("");
+  }
+
+  const valueNode = getXmlNodesByLocalName(cellNode, "v")[0];
+  const value = valueNode?.textContent || "";
+  if (type === "s") {
+    return sharedStrings[Number(value)] || "";
+  }
+  if (type === "str") {
+    return value || getXmlNodesByLocalName(cellNode, "t").map((node) => node.textContent || "").join("");
+  }
+  return value;
+}
+
+async function readXlsxSharedStrings(zip, parser) {
+  const sharedFile = zip.file("xl/sharedStrings.xml");
+  if (!sharedFile) return [];
+  const xml = await sharedFile.async("string");
+  const doc = parser.parseFromString(xml, "text/xml");
+  return getXmlNodesByLocalName(doc, "si").map((item) =>
+    getXmlNodesByLocalName(item, "t").map((node) => node.textContent || "").join("")
+  );
+}
+
+function readXlsxCells(sheetDoc, sharedStrings) {
+  const cells = {};
+  getXmlNodesByLocalName(sheetDoc, "c").forEach((cellNode) => {
+    const ref = String(cellNode.getAttribute("r") || "").toUpperCase();
+    if (!ref) return;
+    cells[ref] = getXlsxCellText(cellNode, sharedStrings);
+  });
+  return cells;
+}
+
+function getCellValue(cells, ref) {
+  return cells[String(ref || "").toUpperCase()];
+}
+
+function getCellNumber(cells, ref, fallback = 0) {
+  const value = parseTemplateNumber(getCellValue(cells, ref));
+  return value ?? fallback;
+}
+
+function sumCellRange(cells, column, startRow, endRow) {
+  let total = 0;
+  for (let row = startRow; row <= endRow; row += 1) {
+    total += getCellNumber(cells, `${column}${row}`, 0);
+  }
+  return total;
+}
+
+function numberToRatio(value) {
+  const amount = Number(value) || 0;
+  return Math.abs(amount) > 1 ? amount / 100 : amount;
+}
+
+function ratioToPercent(value) {
+  const amount = Number(value) || 0;
+  return Math.abs(amount) <= 1.5 ? amount * 100 : amount;
+}
+
+function buildCapexTemplateStateFromCells(cells, sourceName) {
+  const investment = {
+    equipmentCost: getCellNumber(cells, "D8", Number(getInputValue("equipmentCost")) || 0),
+    propertyInfrastructureCost: getCellNumber(cells, "D9", Number(getInputValue("propertyInfrastructureCost")) || 0),
+    installationCost: getCellNumber(cells, "D10", Number(getInputValue("installationCost")) || 0),
+    trainingCost: getCellNumber(cells, "D11", Number(getInputValue("trainingCost")) || 0),
+    otherCosts: getCellNumber(cells, "D12", Number(getInputValue("otherCosts")) || 0),
+    workingCapital: 0,
+    salvageValue: getCellNumber(cells, "L34", Number(getInputValue("salvageValue")) || 0),
+  };
+  const life = getCellNumber(cells, "L33", getInputValue("projectLife") || 5);
+  const years = Math.min(5, getTemplateYears(life));
+  const depreciableInvestment = getCellNumber(
+    cells,
+    "L32",
+    investment.equipmentCost + investment.installationCost + investment.trainingCost + investment.otherCosts
+  );
+  const annualDepreciation = getCellNumber(
+    cells,
+    "L35",
+    Math.max(depreciableInvestment - investment.salvageValue, 0) / Math.max(Number(life) || years, 1)
+  );
+  const growthColumns = ["E", "F", "G", "H", "I"];
+  const incrementalCostColumns = ["L", "M", "N", "O", "P"];
+  const savingsColumns = ["D", "E", "F", "G", "H"];
+  let units = getCellNumber(cells, "D22", Number(getInputValue("salesUnitsYear1")) || 0);
+  let ticketPrice = getCellNumber(cells, "D23", Number(getInputValue("ticketPrice")) || 0);
+  let revenue = units * ticketPrice;
+  let variableCost = numberToRatio(getCellNumber(cells, "D24", Number(getInputValue("variableCostPct")) || 0)) * revenue;
+  let salesExpense = numberToRatio(getCellNumber(cells, "D25", Number(getInputValue("salesExpensePct")) || 0)) * revenue;
+  let fixedCost = getCellNumber(cells, "D26", Number(getInputValue("fixedCommercialCost")) || 0);
+  const baseYear = {
+    units,
+    ticketPrice,
+    revenue,
+    variableCost,
+    salesExpense,
+    fixedCost,
+    incrementalCost: 0,
+    savings: 0,
+    depreciation: 0,
+    operatingResult: revenue - variableCost - salesExpense - fixedCost,
+  };
+  const hasRevenueImpact = baseYear.revenue > 0;
+  const totalSavings = savingsColumns.reduce((total, column) => total + getCellNumber(cells, `${column}38`, sumCellRange(cells, column, 32, 37)), 0);
+  const impactCategory = hasRevenueImpact
+    ? "Ventas"
+    : totalSavings > 0
+      ? "Ahorro"
+      : "No genera impacto economico";
+  const annual = [];
+
+  for (let index = 0; index < years; index += 1) {
+    const growthColumn = growthColumns[index];
+    const incrementalCostColumn = incrementalCostColumns[index];
+    const savingsColumn = savingsColumns[index];
+    const unitGrowth = numberToRatio(getCellNumber(cells, `${growthColumn}22`, 0));
+    const ticketGrowth = numberToRatio(getCellNumber(cells, `${growthColumn}23`, 0));
+    const variableCostGrowth = numberToRatio(getCellNumber(cells, `${growthColumn}24`, 0));
+    const salesExpenseGrowth = numberToRatio(getCellNumber(cells, `${growthColumn}25`, 0));
+    const fixedCostGrowth = numberToRatio(getCellNumber(cells, `${growthColumn}26`, 0));
+
+    units *= 1 + unitGrowth;
+    ticketPrice *= 1 + ticketGrowth;
+    revenue = units * ticketPrice;
+    variableCost *= 1 + variableCostGrowth;
+    salesExpense *= 1 + salesExpenseGrowth;
+    fixedCost *= 1 + fixedCostGrowth;
+    const incrementalCost = getCellNumber(cells, `${incrementalCostColumn}27`, sumCellRange(cells, incrementalCostColumn, 21, 26));
+    const savings = getCellNumber(cells, `${savingsColumn}38`, sumCellRange(cells, savingsColumn, 32, 37));
+    const operatingResult = revenue - variableCost - salesExpense - fixedCost - annualDepreciation - incrementalCost + savings;
+
+    annual.push({
+      year: index + 1,
+      units,
+      unitGrowthPct: unitGrowth * 100,
+      ticketPrice,
+      revenue,
+      variableCost,
+      variableCostPct: revenue ? (variableCost / revenue) * 100 : 0,
+      salesExpense,
+      salesExpensePct: revenue ? (salesExpense / revenue) * 100 : 0,
+      fixedCost,
+      fixedCostGrowthPct: fixedCostGrowth * 100,
+      savings,
+      savingsGrowthPct: 0,
+      riskBenefit: 0,
+      incrementalCost,
+      opex: incrementalCost,
+      depreciation: annualDepreciation,
+      operatingResult,
+    });
+  }
+
+  return {
+    sourceName,
+    loadedAt: new Date().toISOString(),
+    model: "Formato Excel Datos Capex",
+    cashFlowMode: "operatingCashFlowBeforeTax",
+    impactCategory,
+    years,
+    baseYear,
+    investment,
+    annual,
+  };
+}
+
+async function parseCapexXlsxTemplate(arrayBuffer, sourceName = "formato excel") {
+  if (!window.JSZip) {
+    throw new Error("No esta disponible el lector de archivos XLSX.");
+  }
+  const zip = await window.JSZip.loadAsync(arrayBuffer);
+  const parser = new DOMParser();
+  const workbookFile = zip.file("xl/workbook.xml");
+  const workbookRelsFile = zip.file("xl/_rels/workbook.xml.rels");
+  if (!workbookFile || !workbookRelsFile) {
+    throw new Error("El archivo no parece ser un libro XLSX valido.");
+  }
+  const workbookDoc = parser.parseFromString(await workbookFile.async("string"), "text/xml");
+  const relsDoc = parser.parseFromString(await workbookRelsFile.async("string"), "text/xml");
+  const sheets = getXmlNodesByLocalName(workbookDoc, "sheet");
+  const selectedSheet = sheets.find((sheet) => normalizeLookupText(sheet.getAttribute("name")).includes("plantilla capex")) || sheets[0];
+  if (!selectedSheet) {
+    throw new Error("No se encontro una hoja de calculo en el archivo.");
+  }
+  const sheetRelId = getRelationshipId(selectedSheet);
+  const relationship = getXmlNodesByLocalName(relsDoc, "Relationship").find((rel) => rel.getAttribute("Id") === sheetRelId);
+  const sheetPath = resolveWorkbookTarget(relationship?.getAttribute("Target"));
+  const sheetFile = zip.file(sheetPath);
+  if (!sheetFile) {
+    throw new Error("No se pudo abrir la hoja principal del formato.");
+  }
+  const sharedStrings = await readXlsxSharedStrings(zip, parser);
+  const sheetDoc = parser.parseFromString(await sheetFile.async("string"), "text/xml");
+  const cells = readXlsxCells(sheetDoc, sharedStrings);
+  return buildCapexTemplateStateFromCells(cells, sourceName);
+}
+
+function updateAnnualTemplateStatus() {
+  if (!annualTemplateStatus) return;
+  if (!annualTemplateState) {
+    annualTemplateStatus.textContent = "Sin formato Excel cargado. El calculo usa los supuestos base del formulario.";
+    return;
+  }
+  annualTemplateStatus.textContent = `Formato cargado: ${annualTemplateState.sourceName}. Analisis por ${annualTemplateState.years} anos.`;
+}
+
+function setAnnualTemplateState(state) {
+  annualTemplateState = state || null;
+  if (elements.annualTemplatePayload) {
+    elements.annualTemplatePayload.value = state ? JSON.stringify(state) : "";
+  }
+  updateAnnualTemplateStatus();
+}
+
+function getActiveAnnualTemplate() {
+  if (annualTemplateState) return annualTemplateState;
+  const payload = getInputValue("annualTemplatePayload");
+  if (!payload) return null;
+  try {
+    annualTemplateState = JSON.parse(payload);
+    updateAnnualTemplateStatus();
+    return annualTemplateState;
+  } catch (error) {
+    console.warn("No se pudo leer la plantilla anual guardada.", error);
+    return null;
+  }
+}
+
+function applyAnnualTemplateToInput(input) {
+  const template = getActiveAnnualTemplate();
+  if (!template) return input;
+  input.annualTemplate = template;
+  input.projectLife = template.years || input.projectLife;
+  Object.entries(template.investment || {}).forEach(([key, value]) => {
+    if (isFiniteNumber(value)) input[key] = value;
+  });
+  input.requiredInvestmentTotal =
+    (Number(input.equipmentCost) || 0) +
+    (Number(input.installationCost) || 0) +
+    (Number(input.propertyInfrastructureCost) || 0) +
+    (Number(input.trainingCost) || 0) +
+    (Number(input.otherCosts) || 0);
+  const firstYear = template.annual?.[0] || {};
+  input.impactCategory = template.impactCategory || input.impactCategory;
+  if (input.impactCategory === "Ventas") {
+    if (isFiniteNumber(firstYear.units)) input.salesUnitsYear1 = firstYear.units;
+    if (isFiniteNumber(firstYear.ticketPrice)) input.ticketPrice = firstYear.ticketPrice;
+    if (isFiniteNumber(firstYear.variableCostPct)) input.variableCostPct = firstYear.variableCostPct;
+    if (isFiniteNumber(firstYear.salesExpensePct)) input.salesExpensePct = firstYear.salesExpensePct;
+    if (isFiniteNumber(firstYear.fixedCost)) input.fixedCommercialCost = firstYear.fixedCost;
+  } else if (input.impactCategory === "Ahorro") {
+    if (isFiniteNumber(firstYear.savings)) input.annualCostSavings = firstYear.savings;
+    if (isFiniteNumber(firstYear.riskBenefit)) input.riskAvoidanceBenefit = firstYear.riskBenefit;
+    if (isFiniteNumber(firstYear.opex)) input.annualOpexIncrease = firstYear.opex;
+  } else if (isFiniteNumber(firstYear.opex)) {
+    input.annualOpexIncrease = firstYear.opex;
+  }
+  if (isFiniteNumber(firstYear.depreciation) && firstYear.depreciation > 0) {
+    input.annualDepreciation = firstYear.depreciation;
+  }
+  return input;
+}
+
+function applyAnnualTemplateToForm(state) {
+  if (!state) return;
+  syncImpactCategory(state.impactCategory || "Ventas");
+  setFieldValue("projectLife", state.years || getInputValue("projectLife"));
+  Object.entries(state.investment || {}).forEach(([id, value]) => {
+    if (elements[id] && isFiniteNumber(value)) {
+      setFieldValue(id, value);
+    }
+  });
+  syncRequiredInvestmentTotal();
+  const firstYear = state.annual?.[0] || {};
+  if (state.impactCategory === "Ventas") {
+    if (isFiniteNumber(firstYear.units)) setFieldValue("salesUnitsYear1", Math.round(firstYear.units));
+    if (isFiniteNumber(firstYear.ticketPrice)) setFieldValue("ticketPrice", firstYear.ticketPrice);
+    if (isFiniteNumber(firstYear.variableCostPct)) setFieldValue("variableCostPct", firstYear.variableCostPct);
+    if (isFiniteNumber(firstYear.salesExpensePct)) setFieldValue("salesExpensePct", firstYear.salesExpensePct);
+    if (isFiniteNumber(firstYear.fixedCost)) setFieldValue("fixedCommercialCost", Math.round(firstYear.fixedCost));
+  } else if (state.impactCategory === "Ahorro") {
+    if (isFiniteNumber(firstYear.savings)) setFieldValue("annualCostSavings", Math.round(firstYear.savings));
+    if (isFiniteNumber(firstYear.riskBenefit)) setFieldValue("riskAvoidanceBenefit", Math.round(firstYear.riskBenefit));
+    if (isFiniteNumber(firstYear.opex)) setFieldValue("annualOpexIncrease", Math.round(firstYear.opex));
+  } else if (isFiniteNumber(firstYear.opex)) {
+    setFieldValue("annualOpexIncrease", Math.round(firstYear.opex));
+  }
+  if (isFiniteNumber(firstYear.depreciation) && firstYear.depreciation > 0) {
+    setFieldValue("annualDepreciation", Math.round(firstYear.depreciation));
+  }
+}
+
+function exportAnnualTemplate() {
+  const input = getInputs();
+  const blob = buildAnnualTemplateWorkbook(input);
+  downloadBlob(`plantilla-capex-${slugify(input.projectName)}.xls`, blob);
+  statusNode.textContent = "Plantilla Excel de inversion e impacto generada.";
+}
+
+async function importAnnualTemplateFile(file) {
+  if (!file) return;
+  try {
+    statusNode.textContent = `Leyendo formato "${file.name}"...`;
+    const isXlsx = /\.xlsx$/i.test(file.name);
+    const state = isXlsx
+      ? await parseCapexXlsxTemplate(await file.arrayBuffer(), file.name)
+      : parseAnnualTemplateWorkbook(await file.text(), file.name);
+    setAnnualTemplateState(state);
+    applyAnnualTemplateToForm(state);
+    evaluateProject({ persist: false });
+    statusNode.textContent = `Formato "${file.name}" cargado y analizado. El reporte usara los supuestos por ano.`;
+  } catch (error) {
+    console.error(error);
+    statusNode.textContent = "No se pudo leer el formato. Usa el Excel descargado desde esta app y conserva la estructura de celdas.";
+    setAnnualTemplateState(null);
+  }
+}
+
 function getEvaluationPackage() {
   const input = getInputs();
   const evaluation = buildEvaluation(input);
@@ -1548,6 +2123,14 @@ function buildSharePointPayload(input, evaluation) {
     maltaProject: formatMaltaProject(input),
     groupKpi: input.groupKpi,
     projectGoal: input.projectGoal,
+    annualTemplate: input.annualTemplate
+      ? {
+        sourceName: input.annualTemplate.sourceName,
+        years: input.annualTemplate.years,
+        investment: input.annualTemplate.investment,
+        annual: input.annualTemplate.annual,
+      }
+      : null,
     otherMaltaJustification: input.otherMaltaJustification,
     recommendation: evaluation.recommendation.label,
     recommendationTone: evaluation.recommendation.tone,
@@ -1701,10 +2284,18 @@ function buildCashFlows(input) {
   const years = Math.max(3, Math.min(10, Math.round(input.projectLife)));
   const taxRate = input.taxRate / 100;
   const discountRate = input.discountRate / 100;
-  const contributionMarginPct = clamp(1 - (input.variableCostPct + input.salesExpensePct) / 100, 0, 1);
-  const contributionPerUnit = (input.ticketPrice || 0) * contributionMarginPct;
+  const annualTemplateRows = Array.isArray(input.annualTemplate?.annual) ? input.annualTemplate.annual : [];
+  const usePreTaxTemplateCashFlow = input.annualTemplate?.cashFlowMode === "operatingCashFlowBeforeTax";
+  const getAnnualTemplateRow = (year) => annualTemplateRows.find((row) => Number(row.year) === year) || annualTemplateRows[year - 1] || {};
+  const firstYearTemplate = getAnnualTemplateRow(1);
+  const baseTicketPrice = isFiniteNumber(firstYearTemplate.ticketPrice) ? firstYearTemplate.ticketPrice : (input.ticketPrice || 0);
+  const baseVariableCostPct = isFiniteNumber(firstYearTemplate.variableCostPct) ? firstYearTemplate.variableCostPct : input.variableCostPct;
+  const baseSalesExpensePct = isFiniteNumber(firstYearTemplate.salesExpensePct) ? firstYearTemplate.salesExpensePct : input.salesExpensePct;
+  const baseFixedCost = isFiniteNumber(firstYearTemplate.fixedCost) ? firstYearTemplate.fixedCost : input.fixedCommercialCost;
+  const contributionMarginPct = clamp(1 - (baseVariableCostPct + baseSalesExpensePct) / 100, 0, 1);
+  const contributionPerUnit = (baseTicketPrice || 0) * contributionMarginPct;
   const breakEvenUnits = input.impactCategory === "Ventas" && contributionPerUnit > 0
-    ? Math.ceil((input.fixedCommercialCost || 0) / contributionPerUnit)
+    ? Math.ceil((baseFixedCost || 0) / contributionPerUnit)
     : null;
   const flows = [];
   const cashFlows = [-totalInvestment];
@@ -1720,36 +2311,62 @@ function buildCashFlows(input) {
     let salesExpense = 0;
     let fixedCost = 0;
     let opex = 0;
+    let incrementalOpex = 0;
 
     if (input.impactCategory === "Ventas") {
+      const annualTemplate = getAnnualTemplateRow(year);
       const unitGrowthFactor = (1 + input.unitGrowthRate / 100) ** (year - 1);
-      units = input.salesUnitsYear1 * unitGrowthFactor;
-      revenue = units * input.ticketPrice;
-      variableCost = revenue * (input.variableCostPct / 100);
-      salesExpense = revenue * (input.salesExpensePct / 100);
-      fixedCost = input.fixedCommercialCost * (1 + (input.fixedCommercialCostGrowthPct || 0) / 100) ** (year - 1);
-      opex = variableCost + salesExpense + fixedCost;
+      const ticketPrice = isFiniteNumber(annualTemplate.ticketPrice) ? annualTemplate.ticketPrice : input.ticketPrice;
+      const variableCostPct = isFiniteNumber(annualTemplate.variableCostPct) ? annualTemplate.variableCostPct : input.variableCostPct;
+      const salesExpensePct = isFiniteNumber(annualTemplate.salesExpensePct) ? annualTemplate.salesExpensePct : input.salesExpensePct;
+      units = isFiniteNumber(annualTemplate.units) ? annualTemplate.units : input.salesUnitsYear1 * unitGrowthFactor;
+      revenue = isFiniteNumber(annualTemplate.revenue) ? annualTemplate.revenue : units * ticketPrice;
+      savings = isFiniteNumber(annualTemplate.savings) ? annualTemplate.savings : 0;
+      riskBenefit = isFiniteNumber(annualTemplate.riskBenefit) ? annualTemplate.riskBenefit : 0;
+      variableCost = isFiniteNumber(annualTemplate.variableCost)
+        ? annualTemplate.variableCost
+        : revenue * (variableCostPct / 100);
+      salesExpense = isFiniteNumber(annualTemplate.salesExpense)
+        ? annualTemplate.salesExpense
+        : revenue * (salesExpensePct / 100);
+      fixedCost = isFiniteNumber(annualTemplate.fixedCost)
+        ? annualTemplate.fixedCost
+        : input.fixedCommercialCost * (1 + (input.fixedCommercialCostGrowthPct || 0) / 100) ** (year - 1);
+      incrementalOpex = isFiniteNumber(annualTemplate.incrementalCost)
+        ? annualTemplate.incrementalCost
+        : isFiniteNumber(annualTemplate.opex)
+          ? annualTemplate.opex
+          : 0;
+      opex = variableCost + salesExpense + fixedCost + incrementalOpex;
     } else if (input.impactCategory === "Ahorro") {
+      const annualTemplate = getAnnualTemplateRow(year);
       const growthFactor = (1 + input.annualGrowthRate / 100) ** (year - 1);
-      savings = input.annualCostSavings * growthFactor;
-      riskBenefit = input.riskAvoidanceBenefit * growthFactor;
-      opex = input.annualOpexIncrease * growthFactor;
+      savings = isFiniteNumber(annualTemplate.savings) ? annualTemplate.savings : input.annualCostSavings * growthFactor;
+      riskBenefit = isFiniteNumber(annualTemplate.riskBenefit) ? annualTemplate.riskBenefit : input.riskAvoidanceBenefit * growthFactor;
+      opex = isFiniteNumber(annualTemplate.opex) ? annualTemplate.opex : input.annualOpexIncrease * growthFactor;
     } else {
-      opex = input.annualOpexIncrease;
-      riskBenefit = 0;
+      const annualTemplate = getAnnualTemplateRow(year);
+      opex = isFiniteNumber(annualTemplate.opex) ? annualTemplate.opex : input.annualOpexIncrease;
+      riskBenefit = isFiniteNumber(annualTemplate.riskBenefit) ? annualTemplate.riskBenefit : 0;
       savings = 0;
     }
 
     const ebitda = revenue + savings + riskBenefit - opex;
-    const ebit = ebitda - input.annualDepreciation;
-    const taxes = Math.max(ebit, 0) * taxRate;
+    const annualTemplate = getAnnualTemplateRow(year);
+    const depreciation = isFiniteNumber(annualTemplate.depreciation) && annualTemplate.depreciation > 0
+      ? annualTemplate.depreciation
+      : input.annualDepreciation;
+    const ebit = ebitda - depreciation;
+    const taxes = usePreTaxTemplateCashFlow ? 0 : Math.max(ebit, 0) * taxRate;
     const netIncome = ebit - taxes;
-    const fixedBurden = fixedCost + input.annualDepreciation;
-    const breakEvenMonthlyRevenue = input.impactCategory === "Ventas" && contributionMarginPct > 0
-      ? fixedBurden / contributionMarginPct / 12
+    const annualContributionMarginPct = revenue > 0 ? clamp((revenue - variableCost - salesExpense) / revenue, 0, 1) : contributionMarginPct;
+    const annualTicketPrice = units > 0 ? revenue / units : baseTicketPrice;
+    const fixedBurden = fixedCost + incrementalOpex + depreciation;
+    const breakEvenMonthlyRevenue = input.impactCategory === "Ventas" && annualContributionMarginPct > 0
+      ? fixedBurden / annualContributionMarginPct / 12
       : 0;
-    const breakEvenMonthlyUnits = input.impactCategory === "Ventas" && input.ticketPrice > 0
-      ? breakEvenMonthlyRevenue / input.ticketPrice
+    const breakEvenMonthlyUnits = input.impactCategory === "Ventas" && annualTicketPrice > 0
+      ? breakEvenMonthlyRevenue / annualTicketPrice
       : 0;
     const netMarginPct = revenue > 0 ? (netIncome / revenue) * 100 : 0;
     let netFlow = ebitda - taxes;
@@ -1772,7 +2389,8 @@ function buildCashFlows(input) {
       salesExpense,
       fixedCost,
       opex,
-      depreciation: input.annualDepreciation,
+      incrementalOpex,
+      depreciation,
       netFlow,
       discountedFlow,
       ebitda,
@@ -1838,12 +2456,13 @@ function buildEvaluation(input) {
   ];
 
   if (input.impactCategory === "Ventas") {
-    const breakEvenCoverage = breakEvenUnits ? (input.salesUnitsYear1 / breakEvenUnits) * 100 : 0;
+    const yearOneUnits = firstYearFlow.units || input.salesUnitsYear1;
+    const breakEvenCoverage = breakEvenUnits ? (yearOneUnits / breakEvenUnits) * 100 : 0;
     diagnosticRows.unshift({
       label: "Punto de equilibrio unidades",
       value: clamp(breakEvenCoverage, 0, 140),
       display: breakEvenUnits ? `${number(breakEvenUnits, 0)} unid.` : "No calculable",
-      helper: `Ano 1: ${number(input.salesUnitsYear1, 0)} unid.`,
+      helper: `Ano 1: ${number(yearOneUnits, 0)} unid.`,
     });
   }
 
@@ -1935,13 +2554,15 @@ function buildEvaluation(input) {
     roi,
     eva,
     impactCategory: input.impactCategory,
+    baseYear: input.annualTemplate?.baseYear || null,
+    cashFlowMode: input.annualTemplate?.cashFlowMode || "standardAfterTax",
     breakEvenUnits,
     contributionPerUnit,
     breakEvenMonthlyRevenue: firstYearFlow.breakEvenMonthlyRevenue || 0,
     breakEvenMonthlyUnits: firstYearFlow.breakEvenMonthlyUnits || 0,
     netMarginPct: firstYearFlow.netMarginPct || averageNetMarginPct,
     averageNetMarginPct,
-    salesUnitsYear1: input.salesUnitsYear1,
+    salesUnitsYear1: firstYearFlow.units || input.salesUnitsYear1,
     annualAverageFlow,
     annualAverageRevenue,
     annualAverageSavings,
@@ -1966,10 +2587,11 @@ function buildRecommendation(input, metrics) {
   const meetsScore = metrics.score >= input.targetScore;
   const lead = [];
   const actions = [];
+  const yearOneUnits = metrics.salesUnitsYear1 || input.salesUnitsYear1;
   const hasBreakEvenGap =
     input.impactCategory === "Ventas" &&
     metrics.breakEvenUnits &&
-    input.salesUnitsYear1 < metrics.breakEvenUnits;
+    yearOneUnits < metrics.breakEvenUnits;
   const capexType = normalizeCapexType(input.projectType);
   const highCriticality = input.operationalUrgency >= 4;
   const strongStrategicCase = input.strategicAlignment >= 4 && input.operationalUrgency >= 4;
@@ -2116,7 +2738,7 @@ function statusBelow(value, target, limitFactor = 1.15) {
 }
 
 function renderCards(evaluation) {
-  const expectedMonthlyUnits = evaluation.salesUnitsYear1 / 12;
+  const expectedMonthlyUnits = evaluation.flows[0]?.units ? evaluation.flows[0].units / 12 : 0;
   const expectedMonthlyRevenue = evaluation.flows[0]?.revenue ? evaluation.flows[0].revenue / 12 : 0;
   const breakEvenUnitsStatus = evaluation.breakEvenMonthlyUnits
     ? statusAbove(expectedMonthlyUnits, evaluation.breakEvenMonthlyUnits)
@@ -2278,15 +2900,16 @@ function renderCashFlowTable(flows, evaluation) {
   if (!head || !body) return;
 
   const years = flows.map((flow) => `A\u00f1o ${flow.year}`);
+  const baseYear = evaluation.baseYear || {};
   const yearZero = {
-    revenue: evaluation.impactCategory === "Ventas" ? evaluation.totalInvestment : 0,
-    savings: 0,
-    variableCost: 0,
-    salesExpense: 0,
-    fixedCost: 0,
-    opex: 0,
-    depreciation: 0,
-    ebit: 0,
+    revenue: isFiniteNumber(baseYear.revenue) ? baseYear.revenue : 0,
+    savings: isFiniteNumber(baseYear.savings) ? baseYear.savings : 0,
+    variableCost: isFiniteNumber(baseYear.variableCost) ? baseYear.variableCost : 0,
+    salesExpense: isFiniteNumber(baseYear.salesExpense) ? baseYear.salesExpense : 0,
+    fixedCost: isFiniteNumber(baseYear.fixedCost) ? baseYear.fixedCost : 0,
+    opex: isFiniteNumber(baseYear.incrementalCost) ? baseYear.incrementalCost : 0,
+    depreciation: isFiniteNumber(baseYear.depreciation) ? baseYear.depreciation : 0,
+    ebit: isFiniteNumber(baseYear.operatingResult) ? baseYear.operatingResult : 0,
     taxes: 0,
     netIncome: 0,
     breakEvenMonthlyRevenue: null,
@@ -2300,9 +2923,15 @@ function renderCashFlowTable(flows, evaluation) {
 
   const salesCostRows = evaluation.impactCategory === "Ventas"
     ? [
-      { label: "Costo de venta", values: [yearZero.variableCost, ...flows.map((flow) => flow.variableCost)] },
-      { label: "Gasto variable", values: [yearZero.salesExpense, ...flows.map((flow) => flow.salesExpense)] },
+      { label: "Costo variable", values: [yearZero.variableCost, ...flows.map((flow) => flow.variableCost)] },
+      { label: "Costo de venta", values: [yearZero.salesExpense, ...flows.map((flow) => flow.salesExpense)] },
       { label: "Gasto fijo", values: [yearZero.fixedCost, ...flows.map((flow) => flow.fixedCost)] },
+    ]
+    : [];
+  const salesTemplateOperatingRows = evaluation.impactCategory === "Ventas"
+    ? [
+      { label: "Costos incrementales", values: [yearZero.opex, ...flows.map((flow) => flow.incrementalOpex || 0)] },
+      { label: "Ahorros", values: [yearZero.savings, ...flows.map((flow) => flow.savings)] },
     ]
     : [];
   const nonSalesOperatingRows = evaluation.impactCategory !== "Ventas"
@@ -2334,8 +2963,10 @@ function renderCashFlowTable(flows, evaluation) {
   const rows = [
     { label: "Ventas", values: [yearZero.revenue, ...flows.map((flow) => flow.revenue)] },
     ...salesCostRows,
+    ...salesTemplateOperatingRows,
     ...nonSalesOperatingRows,
     { label: "Depreciaci\u00f3n", values: [yearZero.depreciation, ...flows.map((flow) => flow.depreciation)] },
+    { label: "EBITDA", values: [yearZero.ebit, ...flows.map((flow) => flow.ebitda)], emphasis: true },
     { label: "EBIT", values: [yearZero.ebit, ...flows.map((flow) => flow.ebit)], emphasis: true },
     { label: "Impuestos", values: [yearZero.taxes, ...flows.map((flow) => flow.taxes)] },
     { label: "Utilidad Neta", values: [yearZero.netIncome, ...flows.map((flow) => flow.netIncome)], emphasis: true },
@@ -2697,7 +3328,7 @@ async function buildDetailedExecutivePdf(input, evaluation) {
     fillRect(ops, x + 7, y + 10, (width - 14) * clamp(row.value, 0, 100) / 100, 6, "#1f36b3");
   };
   const expectedMonthlyRevenue = evaluation.flows[0]?.revenue ? evaluation.flows[0].revenue / 12 : 0;
-  const expectedMonthlyUnits = evaluation.salesUnitsYear1 ? evaluation.salesUnitsYear1 / 12 : 0;
+  const expectedMonthlyUnits = evaluation.flows[0]?.units ? evaluation.flows[0].units / 12 : 0;
   const breakEvenRevenueStatus = evaluation.breakEvenMonthlyRevenue
     ? statusAbove(expectedMonthlyRevenue, evaluation.breakEvenMonthlyRevenue)
     : "neutral";
@@ -2784,6 +3415,9 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   fillRect(page1, margin, 58, contentWidth, 136, "#ffffff");
   strokeRect(page1, margin, 58, contentWidth, 136);
   sectionTitle(page1, "Supuestos base", margin + 14, 176);
+  if (input.annualTemplate) {
+    addText(page1, `Plantilla anual: ${input.annualTemplate.sourceName || "cargada"} (${input.annualTemplate.years || input.projectLife} anos)`, margin + 302, 176, 6.8, "#0f6f4d", "F2");
+  }
   let assumptionY = 154;
   assumptionRows.forEach((row) => {
     [0, 1, 2].forEach((index) => {
@@ -2797,15 +3431,18 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   const page2 = startPage("DETALLE DE FLUJOS", input.projectName || "Proyecto CAPEX");
   sectionTitle(page2, "Matriz de flujos y resultados", margin, 680, 150);
   const years = evaluation.flows.map((flow) => `A\u00f1o ${flow.year}`);
+  const baseYear = input.annualTemplate?.baseYear || {};
   const yearZero = {
-    revenue: input.impactCategory === "Ventas" ? evaluation.totalInvestment : 0,
-    savings: 0,
-    variableCost: 0,
-    salesExpense: 0,
-    fixedCost: 0,
-    opex: 0,
-    depreciation: 0,
-    ebit: 0,
+    units: isFiniteNumber(baseYear.units) ? baseYear.units : null,
+    ticketPrice: isFiniteNumber(baseYear.ticketPrice) ? baseYear.ticketPrice : null,
+    revenue: isFiniteNumber(baseYear.revenue) ? baseYear.revenue : 0,
+    savings: isFiniteNumber(baseYear.savings) ? baseYear.savings : 0,
+    variableCost: isFiniteNumber(baseYear.variableCost) ? baseYear.variableCost : 0,
+    salesExpense: isFiniteNumber(baseYear.salesExpense) ? baseYear.salesExpense : 0,
+    fixedCost: isFiniteNumber(baseYear.fixedCost) ? baseYear.fixedCost : 0,
+    opex: isFiniteNumber(baseYear.incrementalCost) ? baseYear.incrementalCost : 0,
+    depreciation: isFiniteNumber(baseYear.depreciation) ? baseYear.depreciation : 0,
+    ebit: isFiniteNumber(baseYear.operatingResult) ? baseYear.operatingResult : 0,
     taxes: 0,
     netIncome: 0,
     netFlow: -evaluation.totalInvestment,
@@ -2818,9 +3455,15 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   };
   const salesCostRows = input.impactCategory === "Ventas"
     ? [
-      { label: "Costo de venta", values: [yearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
-      { label: "Gasto variable", values: [yearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
+      { label: "Costo variable", values: [yearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
+      { label: "Costo de venta", values: [yearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
       { label: "Gasto fijo", values: [yearZero.fixedCost, ...evaluation.flows.map((flow) => flow.fixedCost)] },
+    ]
+    : [];
+  const salesTemplateOperatingRows = input.impactCategory === "Ventas"
+    ? [
+      { label: "Costos incr.", values: [yearZero.opex, ...evaluation.flows.map((flow) => flow.incrementalOpex || 0)] },
+      { label: "Ahorros", values: [yearZero.savings, ...evaluation.flows.map((flow) => flow.savings)] },
     ]
     : [];
   const nonSalesOperatingRows = input.impactCategory !== "Ventas"
@@ -2837,10 +3480,14 @@ async function buildDetailedExecutivePdf(input, evaluation) {
     ]
     : [];
   const flowRows = [
+    { label: "Unidades", values: [yearZero.units, ...evaluation.flows.map((flow) => flow.units)], type: "number" },
+    { label: "Ticket price", values: [yearZero.ticketPrice, ...evaluation.flows.map((flow) => flow.units ? flow.revenue / flow.units : 0)] },
     { label: "Ventas", values: [yearZero.revenue, ...evaluation.flows.map((flow) => flow.revenue)] },
     ...salesCostRows,
+    ...salesTemplateOperatingRows,
     ...nonSalesOperatingRows,
     { label: "Depreciacion", values: [yearZero.depreciation, ...evaluation.flows.map((flow) => flow.depreciation)] },
+    { label: "EBITDA", values: [yearZero.ebit, ...evaluation.flows.map((flow) => flow.ebitda)], emphasis: true },
     { label: "EBIT", values: [yearZero.ebit, ...evaluation.flows.map((flow) => flow.ebit)], emphasis: true },
     { label: "Impuestos", values: [yearZero.taxes, ...evaluation.flows.map((flow) => flow.taxes)] },
     { label: "Utilidad Neta", values: [yearZero.netIncome, ...evaluation.flows.map((flow) => flow.netIncome)], emphasis: true },
@@ -2852,10 +3499,10 @@ async function buildDetailedExecutivePdf(input, evaluation) {
   ];
   const tableX = margin;
   const tableY = 644;
-  const rowHeight = 20;
+  const rowHeight = 17;
   const labelWidth = 94;
   const valueColWidth = (contentWidth - labelWidth) / (years.length + 1);
-  const tableFont = valueColWidth < 44 ? 6.1 : 7;
+  const tableFont = valueColWidth < 44 ? 5.8 : 6.4;
   fillRect(page2, tableX, tableY, contentWidth, rowHeight, "#10253f");
   addText(page2, "Supuestos", tableX + 5, tableY + 7, 7.2, "#ffffff", "F2");
   ["A\u00f1o 0", ...years].forEach((year, index) => {
@@ -3039,7 +3686,7 @@ function buildExcelWorkbook(input, evaluation) {
   ].join("");
 
   const expectedMonthlyRevenue = evaluation.flows[0]?.revenue ? evaluation.flows[0].revenue / 12 : 0;
-  const expectedMonthlyUnits = evaluation.salesUnitsYear1 ? evaluation.salesUnitsYear1 / 12 : 0;
+  const expectedMonthlyUnits = evaluation.flows[0]?.units ? evaluation.flows[0].units / 12 : 0;
   const excelKpiStyleAbove = (value, target, limitFactor = 0.9) => {
     const status = statusAbove(value, target, limitFactor);
     return status === "success" ? "KpiGreen" : status === "warning" ? "KpiWarning" : "KpiRed";
@@ -3132,6 +3779,9 @@ function buildExcelWorkbook(input, evaluation) {
   } else {
     assumptionRows.push(["Impacto", "Sin retorno directo", "Opex incr.", currency(input.annualOpexIncrease), "Riesgo evitado", currency(input.riskAvoidanceBenefit)]);
   }
+  if (input.annualTemplate) {
+    assumptionRows.push(["Plantilla anual", input.annualTemplate.sourceName || "Cargada", "Horizonte", `${number(input.annualTemplate.years || input.projectLife, 0)} anos`, "Uso", "Valores por ano"]);
+  }
 
   const detailedResultRows = [
     row([cell("RESULTADO Y SUPUESTOS", { style: "Title", mergeAcross: 7 })], { height: 34 }),
@@ -3158,15 +3808,18 @@ function buildExcelWorkbook(input, evaluation) {
   ].join("");
 
   const years = evaluation.flows.map((flow) => `A${flow.year}`);
+  const excelBaseYear = input.annualTemplate?.baseYear || {};
   const excelYearZero = {
-    revenue: input.impactCategory === "Ventas" ? evaluation.totalInvestment : 0,
-    savings: 0,
-    variableCost: 0,
-    salesExpense: 0,
-    fixedCost: 0,
-    opex: 0,
-    depreciation: 0,
-    ebit: 0,
+    units: isFiniteNumber(excelBaseYear.units) ? excelBaseYear.units : null,
+    ticketPrice: isFiniteNumber(excelBaseYear.ticketPrice) ? excelBaseYear.ticketPrice : null,
+    revenue: isFiniteNumber(excelBaseYear.revenue) ? excelBaseYear.revenue : 0,
+    savings: isFiniteNumber(excelBaseYear.savings) ? excelBaseYear.savings : 0,
+    variableCost: isFiniteNumber(excelBaseYear.variableCost) ? excelBaseYear.variableCost : 0,
+    salesExpense: isFiniteNumber(excelBaseYear.salesExpense) ? excelBaseYear.salesExpense : 0,
+    fixedCost: isFiniteNumber(excelBaseYear.fixedCost) ? excelBaseYear.fixedCost : 0,
+    opex: isFiniteNumber(excelBaseYear.incrementalCost) ? excelBaseYear.incrementalCost : 0,
+    depreciation: isFiniteNumber(excelBaseYear.depreciation) ? excelBaseYear.depreciation : 0,
+    ebit: isFiniteNumber(excelBaseYear.operatingResult) ? excelBaseYear.operatingResult : 0,
     taxes: 0,
     netIncome: 0,
     netFlow: -evaluation.totalInvestment,
@@ -3179,9 +3832,15 @@ function buildExcelWorkbook(input, evaluation) {
   };
   const excelSalesCostRows = input.impactCategory === "Ventas"
     ? [
-      { label: "Costo de venta", values: [excelYearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
-      { label: "Gasto variable", values: [excelYearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
+      { label: "Costo variable", values: [excelYearZero.variableCost, ...evaluation.flows.map((flow) => flow.variableCost)] },
+      { label: "Costo de venta", values: [excelYearZero.salesExpense, ...evaluation.flows.map((flow) => flow.salesExpense)] },
       { label: "Gasto fijo", values: [excelYearZero.fixedCost, ...evaluation.flows.map((flow) => flow.fixedCost)] },
+    ]
+    : [];
+  const excelSalesTemplateOperatingRows = input.impactCategory === "Ventas"
+    ? [
+      { label: "Costos incrementales", values: [excelYearZero.opex, ...evaluation.flows.map((flow) => flow.incrementalOpex || 0)] },
+      { label: "Ahorros", values: [excelYearZero.savings, ...evaluation.flows.map((flow) => flow.savings)] },
     ]
     : [];
   const excelNonSalesOperatingRows = input.impactCategory !== "Ventas"
@@ -3198,10 +3857,14 @@ function buildExcelWorkbook(input, evaluation) {
     ]
     : [];
   const excelFlowMatrixRows = [
+    { label: "Unidades", values: [excelYearZero.units, ...evaluation.flows.map((flow) => flow.units)], type: "number" },
+    { label: "Ticket price", values: [excelYearZero.ticketPrice, ...evaluation.flows.map((flow) => flow.units ? flow.revenue / flow.units : 0)] },
     { label: "Ventas", values: [excelYearZero.revenue, ...evaluation.flows.map((flow) => flow.revenue)] },
     ...excelSalesCostRows,
+    ...excelSalesTemplateOperatingRows,
     ...excelNonSalesOperatingRows,
     { label: "Depreciaci\u00f3n", values: [excelYearZero.depreciation, ...evaluation.flows.map((flow) => flow.depreciation)] },
+    { label: "EBITDA", values: [excelYearZero.ebit, ...evaluation.flows.map((flow) => flow.ebitda)], emphasis: true },
     { label: "EBIT", values: [excelYearZero.ebit, ...evaluation.flows.map((flow) => flow.ebit)], emphasis: true },
     { label: "Impuestos", values: [excelYearZero.taxes, ...evaluation.flows.map((flow) => flow.taxes)] },
     { label: "Utilidad Neta", values: [excelYearZero.netIncome, ...evaluation.flows.map((flow) => flow.netIncome)], emphasis: true },
@@ -3238,6 +3901,41 @@ function buildExcelWorkbook(input, evaluation) {
     '<Column ss:Width="118"/>',
     ...Array.from({ length: years.length + 1 }, () => '<Column ss:Width="86"/>'),
   ].join("");
+  const annualTemplateWorksheet = input.annualTemplate
+    ? (() => {
+      const flowByYear = new Map(evaluation.flows.map((flow) => [Number(flow.year), flow]));
+      const annualHeader = ["Ano", "Unidades", "Ticket price", "Ventas", "Costo variable", "Costo de venta", "Gasto fijo", "Costos incr.", "Ahorros", "Depreciacion", "Resultado op.", "Flujo neto"];
+      const annualRows = [
+        row([cell("SUPUESTOS ANUALES CARGADOS", { style: "Title", mergeAcross: annualHeader.length - 1 })], { height: 34 }),
+        row([cell("Fuente", { style: "Label" }), cell(input.annualTemplate.sourceName || "Plantilla", { style: "Value", mergeAcross: 3 }), cell("Tipo impacto", { style: "Label" }), cell(input.annualTemplate.impactCategory || input.impactCategory, { style: "Value", mergeAcross: 3 })], { height: 24 }),
+        blankRow,
+        sectionRow("Inversion importada", annualHeader.length - 1),
+        row(["Equipos", input.equipmentCost, "Instalacion", input.installationCost, "Prop. e infra.", input.propertyInfrastructureCost, "Capacitacion", input.trainingCost, "Otros", input.otherCosts].map((value, index) =>
+          cell(value, { style: index % 2 === 0 ? "Label" : "Money" })
+        ), { height: 24 }),
+        blankRow,
+        sectionRow("Variables por ano", annualHeader.length - 1),
+        row(annualHeader.map((label) => cell(label, { style: "TableHeader" })), { height: 24 }),
+        ...input.annualTemplate.annual.map((item) =>
+          row([
+            cell(item.year, { style: "TableCell" }),
+            cell(Math.round(item.units || 0), { style: "TableCell" }),
+            cell(item.ticketPrice || 0, { style: "Money" }),
+            cell(item.revenue || 0, { style: "Money" }),
+            cell(item.variableCost || 0, { style: "Money" }),
+            cell(item.salesExpense || 0, { style: "Money" }),
+            cell(item.fixedCost || 0, { style: "Money" }),
+            cell(item.incrementalCost || item.opex || 0, { style: "Money" }),
+            cell((item.savings || 0) + (item.riskBenefit || 0), { style: "Money" }),
+            cell(item.depreciation || 0, { style: "Money" }),
+            cell(item.operatingResult || flowByYear.get(Number(item.year))?.ebit || 0, { style: "Money" }),
+            cell(flowByYear.get(Number(item.year))?.netFlow || 0, { style: "Money" }),
+          ], { height: 22 })
+        ),
+      ].join("");
+      return `<Worksheet ss:Name="Supuestos Anuales"><Table>${Array.from({ length: annualHeader.length }, () => '<Column ss:Width="105"/>').join("")}${annualRows}</Table></Worksheet>`;
+    })()
+    : "";
 
   const workbook = `<?xml version="1.0"?>
 <?mso-application progid="Excel.Sheet"?>
@@ -3336,6 +4034,7 @@ function buildExcelWorkbook(input, evaluation) {
       ${detailedFlowRows}
     </Table>
   </Worksheet>
+  ${annualTemplateWorksheet}
 </Workbook>`;
 
   return new Blob([workbook], { type: "application/vnd.ms-excel" });
@@ -3431,7 +4130,14 @@ function evaluateProject(options = {}) {
 }
 
 if (evaluateButton) {
-  evaluateButton.addEventListener("click", evaluateProject);
+  evaluateButton.addEventListener("click", () => {
+    if (!validateCurrentStep()) return;
+    const resultIndex = wizardSteps.findIndex((button) => button.dataset.step === "result");
+    if (resultIndex >= 0) {
+      setWizardStep(resultIndex);
+    }
+    evaluateProject();
+  });
 }
 newCapexButton.addEventListener("click", startNewCapex);
 if (sendSharePointButton) {
@@ -3439,6 +4145,16 @@ if (sendSharePointButton) {
 }
 downloadPdfButton.addEventListener("click", exportExecutivePdf);
 downloadExcelButton.addEventListener("click", exportExcelWorkbook);
+if (downloadAnnualTemplateButton && downloadAnnualTemplateButton.tagName !== "A") {
+  downloadAnnualTemplateButton.addEventListener("click", exportAnnualTemplate);
+}
+if (uploadAnnualTemplateInput) {
+  uploadAnnualTemplateInput.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    importAnnualTemplateFile(file);
+    event.target.value = "";
+  });
+}
 elements.businessArea.addEventListener("change", () => syncSponsorByArea());
 elements.businessUnit.addEventListener("change", () => syncSponsorByArea(elements.businessUnit.value));
 elements.projectType.addEventListener("change", () => {

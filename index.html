@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluador CAPEX</title>
-  <link rel="stylesheet" href="styles.css?v=20260429-10">
+  <link rel="stylesheet" href="styles.css?v=20260713-02">
 </head>
 <body>
   <div class="page-shell">
@@ -40,20 +40,8 @@
             <span>1</span>
             <strong>Tipo</strong>
           </button>
-          <button class="wizard-step" type="button" data-step="cost">
-            <span>2</span>
-            <strong>Inversion</strong>
-          </button>
-          <button class="wizard-step" type="button" data-step="impact">
-            <span>3</span>
-            <strong>Impacto</strong>
-          </button>
-          <button class="wizard-step" type="button" data-step="assumptions">
-            <span>4</span>
-            <strong>Supuestos</strong>
-          </button>
           <button class="wizard-step" type="button" data-step="result">
-            <span>5</span>
+            <span>2</span>
             <strong>Resultado</strong>
           </button>
         </nav>
@@ -172,6 +160,19 @@
               <textarea id="projectGoal" rows="3">Reducir paros de linea, elevar productividad y bajar costos de conversion.</textarea>
             </label>
           </div>
+          <div class="excel-template-panel">
+            <div>
+              <strong>Formato Excel de inversion e impacto</strong>
+              <p>Descarga el formato, actualiza las variables por ano y cargalo para que el evaluador use esos supuestos en el resultado y reportes.</p>
+            </div>
+            <div class="template-actions">
+              <a id="downloadAnnualTemplate" class="secondary-button template-download-link" href="plantilla-excel-supuestos-capex.xlsx" download="Plantilla Excel Supuestos Capex.xlsx">Descargar plantilla</a>
+              <label class="secondary-button upload-template-button" for="uploadAnnualTemplate">Cargar plantilla</label>
+              <input id="uploadAnnualTemplate" type="file" accept=".xlsx,.xls,.xml,.html,.htm" hidden>
+              <button id="evaluateProject" class="primary-button" type="button">Evaluar CAPEX</button>
+            </div>
+            <p id="annualTemplateStatus" class="template-status">Sin formato Excel cargado. El calculo usa los supuestos base del formulario.</p>
+          </div>
         </section>
 
         <section class="form-section" hidden aria-hidden="true">
@@ -273,6 +274,7 @@
               <input id="requiredInvestmentTotal" type="number" value="415000" readonly>
             </label>
           </div>
+          <input id="annualTemplatePayload" type="hidden" value="">
           <input id="workingCapital" type="hidden" value="0">
           <input id="salvageValue" type="hidden" value="0">
           <input id="implementationMonths" type="hidden" value="6">
@@ -466,6 +468,7 @@
     </main>
   </div>
 
-  <script src="app.js?v=20260709-01"></script>
+  <script src="assets/jszip.min.js?v=20260717-02"></script>
+  <script src="app.js?v=20260717-02"></script>
 </body>
 </html>

@@ -544,6 +544,56 @@ textarea:focus {
   background: #eef4ff;
 }
 
+.template-download-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.excel-template-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(31, 54, 179, 0.16);
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.excel-template-panel strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--brand-deep);
+  font-size: 0.86rem;
+}
+
+.excel-template-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.template-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.upload-template-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.template-status {
+  grid-column: 1 / -1;
+}
+
 .new-capex-button {
   border-color: rgba(31, 54, 179, 0.32);
   color: var(--brand-deep);
@@ -1238,6 +1288,7 @@ canvas {
   .two-wide,
   .action-row,
   .impact-options,
+  .excel-template-panel,
   .panel-header,
   .wizard-controls {
     grid-template-columns: 1fr;
