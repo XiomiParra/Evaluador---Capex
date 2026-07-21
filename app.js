@@ -1214,7 +1214,7 @@ function getValidationMessages(input, evaluation) {
     ["strategicAlignment", "operationalUrgency"].forEach((id) => {
       const value = Number(getInputValue(id));
       if (value < 1 || value > 5) {
-        add("warning", "Score fuera de rango", "Usa una escala de 1 a 5 en los supuestos cualitativos.");
+        add("warning", "Alineacion fuera de rango", "Usa una escala de 1 a 5 para el peso estrategico Malta.");
       }
     });
     return messages.slice(0, 4);
@@ -1269,10 +1269,10 @@ function getValidationMessages(input, evaluation) {
       add("success", "Payback dentro de politica", "La inversion se recupera dentro del plazo corporativo esperado.");
     }
   }
-  if (evaluation.score >= input.targetScore) {
-    add("success", "Score ejecutivo solido", "La valoracion cualitativa alcanza la meta definida para el tipo de CAPEX.");
+  if (evaluation.score >= 60) {
+    add("success", "Alineacion Malta suficiente", "El proyecto esta vinculado a una prioridad Malta con peso estrategico relevante.");
   } else {
-    add("warning", "Score por reforzar", "La valoracion cualitativa queda debajo de la meta esperada.");
+    add("warning", "Alineacion por reforzar", "Revisa si el Proyecto Malta seleccionado refleja la prioridad real del CAPEX.");
   }
 
   return messages.slice(0, 5);
@@ -2247,30 +2247,10 @@ function calculatePayback(cashFlows) {
 }
 
 function calculateScore(input, metrics) {
-  const financialScore =
-    clamp(metrics.npv / Math.max(metrics.totalInvestment, 1), -1, 1.5) * 22 +
-    clamp(metrics.roi / Math.max(input.targetRoi, 1), 0, 1.5) * 16 +
-    clamp(metrics.irrPct / Math.max(input.requiredIrr, 1), 0, 1.5) * 18 +
-    clamp(input.maxPayback / Math.max(metrics.payback || 99, 1), 0, 1.5) * 12;
-
-  const qualitativeScore =
-    (input.strategicAlignment / 5) * 60 +
-    (input.operationalUrgency / 5) * 40;
-
-  const financialBase = clamp((financialScore / 68) * 100, 0, 100);
-  const qualitativeBase = clamp(qualitativeScore, 0, 100);
-  const weights = {
-    Crecimiento: [0.75, 0.25],
-    Mantenimiento: [0.35, 0.65],
-    Estrategico: [0.45, 0.55],
-    Regulatorio: [0.15, 0.85],
-  }[normalizeCapexType(input.projectType)] || [0.65, 0.35];
-
-  if (input.impactCategory === "No genera impacto economico") {
-    return qualitativeBase;
-  }
-
-  return clamp(financialBase * weights[0] + qualitativeBase * weights[1], 0, 100);
+  const project = stripMaltaProjectNumber(input.maltaProject);
+  if (!project) return 0;
+  const weight = getMaltaProjectWeight(project);
+  return clamp((weight / 5) * 100, 0, 100);
 }
 
 function buildCashFlows(input) {
@@ -2489,24 +2469,15 @@ function buildEvaluation(input) {
     ];
   }
 
+  const maltaWeight = getMaltaProjectWeight(input.maltaProject);
   const scoreRows = [
     {
-      label: "Score",
+      label: "Alineacion estrategica",
       value: score,
       display: `${number(score, 0)} / 100`,
-      helper: `Meta ${number(input.targetScore, 0)}%`,
-    },
-    {
-      label: "Alineacion",
-      value: (input.strategicAlignment / 5) * 100,
-      display: `${input.strategicAlignment}/5`,
-      helper: input.strategicAlignment === 5 ? "Enfoque y Proyecto Malta asignados" : "Otros o sin vinculo Malta",
-    },
-    {
-      label: "Urgencia",
-      value: (input.operationalUrgency / 5) * 100,
-      display: `${input.operationalUrgency}/5`,
-      helper: "Peso Malta",
+      helper: input.maltaProject
+        ? `Proyecto Malta: peso ${number(maltaWeight, 0)}/5`
+        : "Sin Proyecto Malta seleccionado",
     },
   ];
 
@@ -2543,6 +2514,7 @@ function buildEvaluation(input) {
     totalInvestment,
     breakEvenUnits,
     contributionPerUnit,
+    salesUnitsYear1: firstYearFlow.units || input.salesUnitsYear1,
     impactCategory: input.impactCategory,
   });
 
@@ -2577,14 +2549,12 @@ function buildEvaluation(input) {
 }
 
 function buildRecommendation(input, metrics) {
-  const meetsFinancials =
+  const meetsFinancialThresholds =
     metrics.npv > 0 &&
     metrics.irrPct >= input.requiredIrr &&
-    metrics.roi >= input.targetRoi &&
     metrics.payback !== null &&
     metrics.payback <= input.maxPayback;
-
-  const meetsScore = metrics.score >= input.targetScore;
+  const alignmentStrong = metrics.score >= 60;
   const lead = [];
   const actions = [];
   const yearOneUnits = metrics.salesUnitsYear1 || input.salesUnitsYear1;
@@ -2592,120 +2562,61 @@ function buildRecommendation(input, metrics) {
     input.impactCategory === "Ventas" &&
     metrics.breakEvenUnits &&
     yearOneUnits < metrics.breakEvenUnits;
-  const capexType = normalizeCapexType(input.projectType);
-  const highCriticality = input.operationalUrgency >= 4;
-  const strongStrategicCase = input.strategicAlignment >= 4 && input.operationalUrgency >= 4;
-
-  if (capexType === "Regulatorio") {
-    if (metrics.score >= input.targetScore * 0.85 && highCriticality) {
-      lead.push("El CAPEX regulatorio se justifica por cumplimiento y obligatoriedad, aunque el retorno financiero directo sea bajo.");
-      actions.push("Aprobar sujeto a evidencia del requerimiento regulatorio, fecha limite y Sponsor / Driver de cumplimiento.");
-      actions.push("Documentar el riesgo de no ejecutar y el control que quedara implementado.");
-      actions.push("Mantener seguimiento de cumplimiento y cierre post-implementacion con Finanzas y el Sponsor / Driver.");
-      return { label: "VIABLE", tone: "success", lead: lead.join(" "), actions };
-    }
-
-    lead.push("El CAPEX regulatorio requiere mas evidencia antes de aprobarse como obligatorio.");
-    actions.push("Adjuntar sustento normativo, fecha de exigibilidad y consecuencias de no ejecutar.");
-    actions.push("Revisar alcance minimo viable para cumplir sin sobredimensionar la inversion.");
-    actions.push("Confirmar Sponsor / Driver y lider de cierre de cumplimiento.");
-    return { label: "NO VIABLE", tone: "warning", lead: lead.join(" "), actions };
-  }
-
-  if (capexType === "Mantenimiento") {
-    if (metrics.score >= input.targetScore * 0.85 && (highCriticality || metrics.npv >= -metrics.totalInvestment * 0.2)) {
-      lead.push("El CAPEX de mantenimiento prioriza continuidad operativa, reduccion de riesgos y estabilidad del servicio; no depende exclusivamente de VAN positivo.");
-      actions.push("Aprobar si el Sponsor / Driver documenta criticidad, riesgo evitado y plan de ejecucion.");
-      actions.push("Comparar contra alternativa de reparar, arrendar o diferir para confirmar el alcance recomendado.");
-      actions.push("Definir indicadores de continuidad y disponibilidad para medir el beneficio posterior.");
-      return { label: "VIABLE", tone: "success", lead: lead.join(" "), actions };
-    }
-
-    lead.push("La necesidad de mantenimiento es atendible, pero requiere reforzar criticidad o ajustar el alcance.");
-    actions.push("Cuantificar paros evitados, fallas recurrentes o impacto en continuidad operativa.");
-    actions.push("Revisar si existe una fase inicial de menor costo que cubra el riesgo principal.");
-    return { label: "NO VIABLE", tone: "warning", lead: lead.join(" "), actions };
-  }
-
-  if (capexType === "Estrategico") {
-    if (metrics.score >= input.targetScore * 0.9 && strongStrategicCase && metrics.npv >= -metrics.totalInvestment * 0.1) {
-      lead.push("El CAPEX estrategico tiene respaldo cualitativo fuerte y habilita prioridades del Grupo, por lo que puede avanzar aunque el retorno financiero sea moderado.");
-      actions.push("Aprobar con hitos de valor, Sponsor / Driver definido y medicion contra el KPI estrategico seleccionado.");
-      actions.push("Mantener control de alcance para proteger el VAN y la capacidad de ejecucion.");
-      return { label: "VIABLE", tone: "success", lead: lead.join(" "), actions };
-    }
-
-    lead.push("El CAPEX estrategico necesita fortalecer alineacion, evidencia o plan de ejecucion antes de aprobarse.");
-    actions.push("Precisar contribucion al proyecto Malta y al KPI del Grupo seleccionado.");
-    actions.push("Dividir en fases si el retorno financiero o la ejecucion aun tienen incertidumbre.");
-    return { label: "NO VIABLE", tone: "warning", lead: lead.join(" "), actions };
-  }
 
   if (input.impactCategory === "No genera impacto economico") {
-    if (meetsScore) {
-      lead.push("El CAPEX no genera retorno directo, pero el score cualitativo respalda la necesidad por continuidad, cumplimiento o reduccion de riesgo.");
+    if (alignmentStrong) {
+      lead.push("El CAPEX no genera retorno economico directo; la lectura se basa en la alineacion con Proyecto Malta y la prioridad estrategica asignada.");
       actions.push("Aprobar con una justificacion ejecutiva enfocada en riesgo, continuidad operacional y obligatoriedad del proyecto.");
       actions.push("Documentar el costo de no ejecutar y los indicadores no financieros que se van a proteger.");
       actions.push("Definir Sponsor / Driver, fecha objetivo y evidencia de cumplimiento para el cierre post-implementacion.");
       return { label: "VIABLE", tone: "success", lead: lead.join(" "), actions };
     }
 
-    if (metrics.score >= input.targetScore * 0.75) {
-      lead.push("El CAPEX tiene una necesidad cualitativa razonable, pero requiere reforzar evidencias antes de pasar a aprobacion.");
-      actions.push("Completar la justificacion de continuidad, cumplimiento o riesgo con datos verificables.");
-      actions.push("Revisar si el alcance puede reducirse sin comprometer la necesidad critica.");
-      actions.push("Aprobar condicionalmente solo si el Sponsor / Driver documenta consecuencias, fechas y controles.");
-      return { label: "NO VIABLE", tone: "warning", lead: lead.join(" "), actions };
-    }
-
-    lead.push("La necesidad no financiera aun no alcanza el score minimo para justificar el desembolso.");
+    lead.push("El CAPEX no genera retorno economico directo y la alineacion estrategica registrada aun es baja para sostener la aprobacion.");
     actions.push("Reformular el caso con evidencia de riesgo, impacto operativo o requerimiento regulatorio.");
     actions.push("Comparar alternativas de menor costo antes de retomar la solicitud.");
-    actions.push("Posponer la aprobacion hasta que el score cualitativo alcance la meta definida.");
-    return { label: "NO VIABLE", tone: "danger", lead: lead.join(" "), actions };
+    actions.push("Seleccionar el Proyecto Malta correcto o documentar por que debe quedar como Otros.");
+    return { label: "NO VIABLE", tone: "warning", lead: lead.join(" "), actions };
   }
 
-  if (meetsFinancials && meetsScore && metrics.eva > 0) {
-    lead.push("El proyecto muestra creacion de valor, recupera la inversion en un plazo razonable y tiene respaldo estrategico.");
-    actions.push("Aprobar el proyecto y pasar a la etapa de presupuesto detallado y plan de implementacion.");
-    actions.push("Monitorear durante la ejecucion los ahorros anuales y el ramp-up de productividad comprometido.");
+  if (meetsFinancialThresholds) {
+    lead.push("Con base en la plantilla Excel cargada, el proyecto cumple los criterios financieros definidos: VAN positivo, TIR sobre el minimo requerido y payback dentro del plazo maximo.");
+    actions.push("Aprobar el proyecto y pasar a presupuesto detallado, manteniendo los supuestos anuales del Excel como linea base de seguimiento.");
+    actions.push("Monitorear los beneficios, ventas, ahorros y costos incrementales contra la plantilla cargada.");
     if (input.impactCategory === "Ventas") {
       actions.push(`Validar mensualmente unidades vendidas contra el punto de equilibrio de ${number(metrics.breakEvenUnits || 0, 0)} unidades.`);
     }
-    actions.push("Definir un cierre post-implementacion para validar que el EVA y la TIR real sigan en rango.");
+    actions.push("Definir un cierre post-implementacion para validar que VAN, TIR y Payback reales sigan en rango.");
     if (input.implementationMonths > 12) {
       actions.push("Gestionar la implementacion por hitos para evitar que el calendario largo degrade el retorno esperado.");
     }
     return { label: "VIABLE", tone: "success", lead: lead.join(" "), actions };
   }
 
-  if (metrics.npv > 0 && (meetsScore || metrics.eva > 0)) {
-    lead.push("La iniciativa es prometedora, pero algunos supuestos financieros o de ejecucion aun requieren ajuste antes de aprobarla.");
+  if (metrics.npv > 0 || metrics.irrPct >= input.requiredIrr || (metrics.payback !== null && metrics.payback <= input.maxPayback)) {
+    lead.push("La plantilla Excel muestra algun indicador favorable, pero el proyecto no cumple simultaneamente VAN positivo, TIR minima y Payback maximo.");
 
+    if (metrics.npv <= 0) {
+      actions.push("Revisar inversion inicial, beneficios anuales o valor residual hasta lograr VAN positivo.");
+    }
     if (metrics.irrPct < input.requiredIrr) {
       actions.push("Revisar el monto de inversion o escalonar la implementacion para elevar la TIR.");
     }
     if (metrics.payback === null || metrics.payback > input.maxPayback) {
       actions.push("Identificar beneficios de corto plazo para reducir el payback esperado.");
     }
-    if (metrics.roi < input.targetRoi) {
-      actions.push("Revisar supuestos de ahorro, volumen o precio para acercar el ROI a la meta.");
-    }
     if (hasBreakEvenGap) {
       actions.push("Ajustar precio, margen, gasto fijo o volumen esperado para superar el punto de equilibrio en unidades.");
-    }
-    if (metrics.score < input.targetScore) {
-      actions.push("Fortalecer el caso estrategico y la preparacion operativa antes de presentarlo al comite.");
     }
     if (input.implementationMonths > 12) {
       actions.push("Revisar si la ejecucion puede dividirse en fases para bajar el riesgo de una implementacion extensa.");
     }
 
-    actions.push("Aprobar condicionalmente solo si se documentan los ajustes y el Sponsor / Driver.");
+    actions.push("Volver a cargar la plantilla ajustada y recalcular antes de presentarlo al comite.");
     return { label: "NO VIABLE", tone: "warning", lead: lead.join(" "), actions };
   }
 
-  lead.push("Con los supuestos actuales, el proyecto no alcanza el nivel esperado de retorno o score para justificar su aprobacion.");
+  lead.push("Con los supuestos actuales del Excel, el proyecto no cumple los criterios financieros definidos para justificar su aprobacion.");
   actions.push("Reformular el alcance o dividir la iniciativa en fases con menor desembolso inicial.");
   actions.push("Revalidar beneficios anuales, costos incrementales y valor residual con el area operativa.");
   if (hasBreakEvenGap) {
@@ -2714,7 +2625,7 @@ function buildRecommendation(input, metrics) {
   if (input.implementationMonths > 12) {
     actions.push("Reducir la ventana de implementacion o asegurar beneficios parciales por etapa antes de retomarlo.");
   }
-  actions.push("Posponer la aprobacion hasta contar con un caso financiero mas robusto o una necesidad regulatoria clara.");
+  actions.push("Posponer la aprobacion hasta que VAN, TIR y Payback cumplan los umbrales de Finanzas.");
   return { label: "NO VIABLE", tone: "danger", lead: lead.join(" "), actions };
 }
 
@@ -2734,6 +2645,12 @@ function statusAbove(value, target, limitFactor = 0.9) {
 function statusBelow(value, target, limitFactor = 1.15) {
   if (value !== null && value <= target) return "success";
   if (value !== null && value <= target * limitFactor) return "warning";
+  return "danger";
+}
+
+function strategicScoreStatus(score) {
+  if (score >= 80) return "success";
+  if (score >= 60) return "warning";
   return "danger";
 }
 
@@ -2772,10 +2689,10 @@ function renderCards(evaluation) {
       status: statusBelow(evaluation.payback, Number(elements.maxPayback.value), 1.15),
     },
     {
-      label: "Score",
+      label: "Alineacion estrategica",
       value: `${number(evaluation.score, 0)} / 100`,
-      subtext: `Meta ${number(Number(elements.targetScore.value), 0)}%`,
-      status: statusAbove(evaluation.score, Number(elements.targetScore.value), 0.9),
+      subtext: `Peso Malta ${number(getMaltaProjectWeight(getInputValue("maltaProject")), 0)}/5`,
+      status: strategicScoreStatus(evaluation.score),
     },
   ];
 
@@ -3215,13 +3132,13 @@ async function buildExecutivePdf(input, evaluation) {
     ? ["Punto equilibrio", `${number(evaluation.breakEvenUnits || 0, 0)} unid.`, "#33475e"]
     : input.impactCategory === "Ahorro"
       ? ["Ahorro promedio", currency(evaluation.annualAverageSavings || 0), "#1f5fa8"]
-      : ["Score cualitativo", `${number(evaluation.score, 0)} / 100`, "#33475e"];
+      : ["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, "#33475e"];
   const kpis = [
     ["Inversión total", currency(evaluation.totalInvestment), "#1f36b3"],
     ["VAN", currency(evaluation.npv), evaluation.npv >= 0 ? "#1f5fa8" : "#cc4f62"],
     ["TIR", evaluation.irrPct ? percent(evaluation.irrPct) : "No calculable", "#4771d6"],
     ["Payback", evaluation.payback === null ? "No recupera" : `${number(evaluation.payback, 1)} años`, "#7ea3ff"],
-    ["Score", `${number(evaluation.score, 0)} / 100`, evaluation.score >= input.targetScore ? "#1f5fa8" : "#cc4f62"],
+    ["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, strategicScoreStatus(evaluation.score) === "success" ? "#1f5fa8" : "#cc4f62"],
     impactKpi,
   ];
   kpis.forEach(([label, value, color], index) => {
@@ -3341,7 +3258,7 @@ async function buildDetailedExecutivePdf(input, evaluation) {
     ["VAN", currency(evaluation.npv), `Tasa ${percent(input.discountRate)}`, evaluation.npv >= 0 ? "success" : "danger"],
     ["TIR", evaluation.irrPct ? percent(evaluation.irrPct) : "No calculable", `Min. ${percent(input.requiredIrr)}`, statusAbove(evaluation.irrPct || 0, input.requiredIrr, 0.9)],
     ["Payback", evaluation.payback === null ? "No recupera" : `${number(evaluation.payback, 1)} anos`, `Max. ${number(input.maxPayback, 1)} anos`, statusBelow(evaluation.payback, input.maxPayback, 1.15)],
-    ["Score", `${number(evaluation.score, 0)} / 100`, `Meta ${number(input.targetScore, 0)}%`, statusAbove(evaluation.score, input.targetScore, 0.9)],
+    ["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, `Peso Malta ${number(getMaltaProjectWeight(input.maltaProject), 0)}/5`, strategicScoreStatus(evaluation.score)],
     ["ROI", percent(evaluation.roi), `Meta ${percent(input.targetRoi)}`, statusAbove(evaluation.roi, input.targetRoi, 0.85)],
     ["EVA anual", currency(evaluation.eva), "Costo capital", evaluation.eva >= 0 ? "success" : "danger"],
     ["EBITDA prom.", currency(evaluation.ebitdaAverage || 0), "Potencial operativo", evaluation.ebitdaAverage >= 0 ? "success" : "danger"],
@@ -3360,7 +3277,7 @@ async function buildDetailedExecutivePdf(input, evaluation) {
       ["Flujo prom.", currency(evaluation.annualAverageFlow), "Despues de impuestos", evaluation.annualAverageFlow > 0 ? "success" : "danger"]
     );
   } else {
-    kpis.push(["Score cualitativo", `${number(evaluation.score, 0)} / 100`, "Sin retorno directo", statusAbove(evaluation.score, input.targetScore, 0.9)]);
+    kpis.push(["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, "Sin retorno directo", strategicScoreStatus(evaluation.score)]);
   }
 
   const page1 = startPage("REPORTE EJECUTIVO CAPEX", input.projectName || "Proyecto CAPEX");
@@ -3599,13 +3516,13 @@ function buildExcelWorkbook(input, evaluation) {
     ? ["Punto equilibrio", `${number(evaluation.breakEvenUnits || 0, 0)} unid.`, "KpiNeutral"]
     : input.impactCategory === "Ahorro"
       ? ["Ahorro promedio", currency(evaluation.annualAverageSavings || 0), "KpiGreen"]
-      : ["Score cualitativo", `${number(evaluation.score, 0)} / 100`, "KpiNeutral"];
+      : ["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, "KpiNeutral"];
   const kpiRows = [
     ["Inversión total", currency(evaluation.totalInvestment), "KpiBlue"],
     ["VAN", currency(evaluation.npv), evaluation.npv >= 0 ? "KpiGreen" : "KpiRed"],
     ["TIR", evaluation.irrPct ? percent(evaluation.irrPct) : "No calculable", "KpiBlue"],
     ["Payback", evaluation.payback === null ? "No recupera" : `${number(evaluation.payback, 1)} años`, "KpiNeutral"],
-    ["Score", `${number(evaluation.score, 0)} / 100`, evaluation.score >= input.targetScore ? "KpiGreen" : "KpiRed"],
+    ["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, strategicScoreStatus(evaluation.score) === "success" ? "KpiGreen" : strategicScoreStatus(evaluation.score) === "warning" ? "KpiWarning" : "KpiRed"],
   ];
 
   const summaryRows = [
@@ -3705,7 +3622,7 @@ function buildExcelWorkbook(input, evaluation) {
     ["EVA anual", currency(evaluation.eva), evaluation.eva >= 0 ? "KpiGreen" : "KpiRed"],
     ["EBITDA prom.", currency(evaluation.ebitdaAverage || 0), evaluation.ebitdaAverage >= 0 ? "KpiGreen" : "KpiRed"],
     ["Beneficio prom.", currency(evaluation.annualAverageFlow || 0), evaluation.annualAverageFlow >= 0 ? "KpiGreen" : "KpiRed"],
-    ["Score", `${number(evaluation.score, 0)} / 100`, excelKpiStyleAbove(evaluation.score, input.targetScore, 0.9)],
+    ["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, strategicScoreStatus(evaluation.score) === "success" ? "KpiGreen" : strategicScoreStatus(evaluation.score) === "warning" ? "KpiWarning" : "KpiRed"],
   ];
 
   if (input.impactCategory === "Ventas") {
@@ -3720,7 +3637,7 @@ function buildExcelWorkbook(input, evaluation) {
       ["Flujo prom.", currency(evaluation.annualAverageFlow || 0), evaluation.annualAverageFlow > 0 ? "KpiGreen" : "KpiRed"]
     );
   } else {
-    detailedKpiRows.push(["Score cualitativo", `${number(evaluation.score, 0)} / 100`, excelKpiStyleAbove(evaluation.score, input.targetScore, 0.9)]);
+    detailedKpiRows.push(["Alineacion estrategica", `${number(evaluation.score, 0)} / 100`, strategicScoreStatus(evaluation.score) === "success" ? "KpiGreen" : strategicScoreStatus(evaluation.score) === "warning" ? "KpiWarning" : "KpiRed"]);
   }
 
   const detailedKpiRowsXml = detailedKpiRows.reduce((rows, current, index) => {
@@ -3787,7 +3704,7 @@ function buildExcelWorkbook(input, evaluation) {
     row([cell("RESULTADO Y SUPUESTOS", { style: "Title", mergeAcross: 7 })], { height: 34 }),
     row([cell(input.projectName || "Proyecto CAPEX", { style: "Subtitle", mergeAcross: 7 })], { height: 24 }),
     blankRow,
-    sectionRow("Score ejecutivo"),
+    sectionRow("Alineacion estrategica"),
     row(["Indicador", "Resultado", "Lectura", "Avance"].map((label) => cell(label, { style: "TableHeader" })), { height: 24 }),
     ...evaluation.scoreRows.map((scoreRow) =>
       row([
